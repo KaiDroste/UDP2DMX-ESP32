@@ -143,215 +143,342 @@ static void fade_task(void *arg)
     }
 }
 
-void udp_server_task(void *pvParameters)
+static void set_channel(int ch, int value, int fade_ms)
 {
+    if (fade_ms > 0 && dmx_data[ch] != value)
+    {
+        start_fade(ch, value, fade_ms);
+    }
+    else
+    {
+        stop_fade(ch);
+        dmx_data[ch] = value;
+        dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+    }
+}
+
+static void set_multi_channels(int ch, int *values, int count, int fade_ms)
+{
+    if (ch + count > DMX_UNIVERSE_SIZE)
+        return;
+
+    if (fade_ms > 0)
+    {
+        for (int i = 0; i < count; ++i)
+        {
+            start_fade(ch + i, values[i], fade_ms);
+        }
+    }
+    else
+    {
+        for (int i = 0; i < count; ++i)
+        {
+            stop_fade(ch + i);
+            dmx_data[ch + i] = values[i];
+        }
+        dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+    }
+}
+
+static void handle_udp_command(const char *cmd)
+{
+    char *copy = strdup(cmd);
+    char *type = strtok(copy + 3, "#");
+    char *arg1 = strtok(NULL, "#");
+    char *arg2 = strtok(NULL, "#");
+
+    if (!type || !arg1)
+    {
+        ESP_LOGW(TAG, "Ungültiges Kommando: %s", cmd);
+        free(copy);
+        return;
+    }
+
+    char mode = type[0];
+    int ch = atoi(type + 1);
+    int val = atoi(arg1);
+    int fade_ms = speed_to_ms(arg2 ? atoi(arg2) : 255);
+
+    if (ch < 1 || ch >= DMX_UNIVERSE_SIZE)
+    {
+        free(copy);
+        return;
+    }
+
+    switch (mode)
+    {
+    case 'R':
+    {
+        int r = roundf((val % 1000) * 2.55f);
+        int g = roundf(((val / 1000) % 1000) * 2.55f);
+        int b = roundf(((val / 1000000) % 1000) * 2.55f);
+        int rgb[3] = {r, g, b};
+        set_multi_channels(ch, rgb, 3, fade_ms);
+        ESP_LOGI(TAG, "RGB %d: R=%d G=%d B=%d", ch, r, g, b);
+        break;
+    }
+    case 'W':
+    {
+        int ww = roundf((val / 1000) * 2.55f);
+        int cw = roundf((val % 1000) * 2.55f);
+        int tw[2] = {ww, cw};
+        set_multi_channels(ch, tw, 2, fade_ms);
+        ESP_LOGI(TAG, "TW %d: WW=%d CW=%d", ch, ww, cw);
+        break;
+    }
+    case 'P':
+        val = (val * 255) / 100;
+    case 'C':
+        set_channel(ch, val, fade_ms);
+        ESP_LOGI(TAG, "Kanal %d gesetzt auf %d", ch, val);
+        break;
+    default:
+        ESP_LOGW(TAG, "Unbekannter Modus: %c", mode);
+        break;
+    }
+
+    free(copy);
+}
+
+void udp_server_task(void *arg)
+{
+    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+    struct sockaddr_in bind_addr = {.sin_family = AF_INET, .sin_port = htons(UDP_PORT), .sin_addr.s_addr = htonl(INADDR_ANY)};
+    bind(sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr));
+
     char rx_buffer[DMX_UNIVERSE_SIZE + 1];
     struct sockaddr_in6 source_addr;
     socklen_t socklen = sizeof(source_addr);
 
-    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-    if (sock < 0)
-    {
-        ESP_LOGE(TAG, "Fehler beim Öffnen des Sockets");
-        vTaskDelete(NULL);
-    }
-
-    struct sockaddr_in bind_addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(UDP_PORT),
-        .sin_addr.s_addr = htonl(INADDR_ANY),
-    };
-
-    if (bind(sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0)
-    {
-        ESP_LOGE(TAG, "Bind fehlgeschlagen");
-        close(sock);
-        vTaskDelete(NULL);
-    }
-
-    ESP_LOGI(TAG, "UDP Server hört auf Port %d", UDP_PORT);
-
     while (1)
     {
-        int len = recvfrom(sock, rx_buffer, DMX_UNIVERSE_SIZE, 0,
-                           (struct sockaddr *)&source_addr, &socklen);
+        int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
         if (len == DMX_UNIVERSE_SIZE)
         {
             memcpy(dmx_data, rx_buffer, DMX_UNIVERSE_SIZE);
-
-            // Alle laufenden Fades stoppen, da neue Daten explizit alles setzen
-            for (int ch = 0; ch < DMX_UNIVERSE_SIZE; ++ch)
-            {
-                fade_states[ch].active = false;
-            }
-
+            for (int i = 0; i < DMX_UNIVERSE_SIZE; ++i)
+                stop_fade(i);
             dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-            for (int i = 1; i < DMX_UNIVERSE_SIZE; ++i)
-            {
-                if (dmx_data[i] != 0)
-                {
-                    ESP_LOGI(TAG, "DMX-Daten aktualisiert, Kanal %d = %d", i, dmx_data[i]);
-                    break;
-                }
-            }
         }
         else if (len > 4 && strncmp(rx_buffer, "DMX", 3) == 0)
         {
             rx_buffer[len] = '\0';
-            ESP_LOGI(TAG, "Empfangenes Kommando: %s", rx_buffer);
             blink_debug_led(1, 20);
-
-            char *type = strtok(rx_buffer + 3, "#");
-            char *arg1 = strtok(NULL, "#");
-            char *arg2 = strtok(NULL, "#");
-            char *arg3 = strtok(NULL, "#");
-
-            if (type && arg1)
-            {
-                char mode = type[0];
-                int channel = atoi(type + 1);
-                int value = atoi(arg1);
-                int speed = (arg2 ? atoi(arg2) : 255);
-                int fade_ms = speed_to_ms(speed);
-
-                if (channel >= 1 && channel < DMX_UNIVERSE_SIZE)
-                {
-                    if (mode == 'R')
-                    {
-                        // value is expected to be R + G*1000 + B*1000000 (e.g. 3066012)
-                        int rgb_value = value;
-                        int r_percent = rgb_value % 1000;
-                        int g_percent = (rgb_value / 1000) % 1000;
-                        int b_percent = (rgb_value / 1000000) % 1000;
-
-                        int r = (int)roundf(r_percent * 2.55f);
-                        int g = (int)roundf(g_percent * 2.55f);
-                        int b = (int)roundf(b_percent * 2.55f);
-
-                        if (channel <= DMX_UNIVERSE_SIZE - 3)
-                        {
-                            if (fade_ms > 0)
-                            {
-                                for (int i = 0; i < 3; i++)
-                                {
-                                    fade_states[channel + i].start_value = dmx_data[channel + i];
-                                    fade_states[channel + i].target_value = (i == 0) ? r : (i == 1) ? g
-                                                                                                    : b;
-                                    fade_states[channel + i].duration_ms = fade_ms;
-                                    fade_states[channel + i].start_time = xTaskGetTickCount();
-                                    fade_states[channel + i].active = true;
-                                }
-
-                                ESP_LOGI(TAG, "Fading RGB @%d → R=%d G=%d B=%d (%d ms)", channel, r, g, b, fade_ms);
-                            }
-                            else
-                            {
-                                dmx_data[channel] = r;
-                                dmx_data[channel + 1] = g;
-                                dmx_data[channel + 2] = b;
-
-                                fade_states[channel].active = false;
-                                fade_states[channel + 1].active = false;
-                                fade_states[channel + 2].active = false;
-
-                                dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-                                ESP_LOGI(TAG, "RGB direkt gesetzt @%d → R=%d G=%d B=%d", channel, r, g, b);
-                            }
-                        }
-                        else
-                        {
-                            ESP_LOGW(TAG, "Nicht genug Kanäle für RGB ab Kanal %d", channel);
-                        }
-                    }
-                    else if (mode == 'W')
-                    {
-                        // Erwartet: 6-stelligen Wert WWWCW, z. B. 070050 für WW=70%, CW=50%
-
-                        if (value < 0 || value > 100100)
-                        {
-                            ESP_LOGW(TAG, "Ungültiger W-Wert: %d", value);
-                            return;
-                        }
-
-                        int ww_percent = value / 1000;
-                        int cw_percent = value % 1000;
-
-                        if (ww_percent > 100 || cw_percent > 100)
-                        {
-                            ESP_LOGW(TAG, "W-Wert außerhalb des Bereichs: WW=%d CW=%d", ww_percent, cw_percent);
-                            return;
-                        }
-
-                        int ww = (int)roundf(ww_percent * 2.55f);
-                        int cw = (int)roundf(cw_percent * 2.55f);
-
-                        if (channel <= DMX_UNIVERSE_SIZE - 2)
-                        {
-                            if (fade_ms > 0)
-                            {
-                                for (int i = 0; i < 2; i++)
-                                {
-                                    fade_states[channel + i].start_value = dmx_data[channel + i];
-                                    fade_states[channel + i].target_value = (i == 0) ? ww : cw;
-                                    fade_states[channel + i].duration_ms = fade_ms;
-                                    fade_states[channel + i].start_time = xTaskGetTickCount();
-                                    fade_states[channel + i].active = true;
-                                }
-
-                                ESP_LOGI(TAG, "Fading TW @%d → WW=%d CW=%d (%d ms)", channel, ww, cw, fade_ms);
-                            }
-                            else
-                            {
-                                dmx_data[channel] = ww;
-                                dmx_data[channel + 1] = cw;
-
-                                fade_states[channel].active = false;
-                                fade_states[channel + 1].active = false;
-
-                                dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-                                ESP_LOGI(TAG, "TW direkt gesetzt @%d → WW=%d CW=%d", channel, ww, cw);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        int target_value = value;
-                        if (mode == 'P')
-                            target_value = (value * 255) / 100;
-                        else if (mode == 'C')
-                            target_value = value;
-
-                        if (fade_ms > 0 && dmx_data[channel] != target_value)
-                        {
-                            fade_states[channel].start_value = dmx_data[channel];
-                            fade_states[channel].target_value = target_value;
-                            fade_states[channel].duration_ms = fade_ms;
-                            fade_states[channel].start_time = xTaskGetTickCount();
-                            fade_states[channel].active = true;
-
-                            ESP_LOGI(TAG, "Fading Kanal %d von %d → %d in %d ms", channel, dmx_data[channel], target_value, fade_ms);
-                        }
-                        else
-                        {
-                            fade_states[channel].active = false;
-                            dmx_data[channel] = target_value;
-                            dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-                            ESP_LOGI(TAG, "Kanal %d direkt auf %d gesetzt", channel, target_value);
-                        }
-                    }
-                }
-            }
-
-            else
-            {
-                ESP_LOGW(TAG, "Falsche Paketlänge: %d", len);
-            }
+            handle_udp_command(rx_buffer);
         }
-
-        // close(sock);
-        // vTaskDelete(NULL);
     }
 }
+
+// # alt
+// void udp_server_task(void *pvParameters)
+// {
+//     char rx_buffer[DMX_UNIVERSE_SIZE + 1];
+//     struct sockaddr_in6 source_addr;
+//     socklen_t socklen = sizeof(source_addr);
+
+//     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+//     if (sock < 0)
+//     {
+//         ESP_LOGE(TAG, "Fehler beim Öffnen des Sockets");
+//         vTaskDelete(NULL);
+//     }
+
+//     struct sockaddr_in bind_addr = {
+//         .sin_family = AF_INET,
+//         .sin_port = htons(UDP_PORT),
+//         .sin_addr.s_addr = htonl(INADDR_ANY),
+//     };
+
+//     if (bind(sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0)
+//     {
+//         ESP_LOGE(TAG, "Bind fehlgeschlagen");
+//         close(sock);
+//         vTaskDelete(NULL);
+//     }
+
+//     ESP_LOGI(TAG, "UDP Server hört auf Port %d", UDP_PORT);
+
+//     while (1)
+//     {
+//         int len = recvfrom(sock, rx_buffer, DMX_UNIVERSE_SIZE, 0,
+//                            (struct sockaddr *)&source_addr, &socklen);
+//         if (len == DMX_UNIVERSE_SIZE)
+//         {
+//             memcpy(dmx_data, rx_buffer, DMX_UNIVERSE_SIZE);
+
+//             // Alle laufenden Fades stoppen, da neue Daten explizit alles setzen
+//             for (int ch = 0; ch < DMX_UNIVERSE_SIZE; ++ch)
+//             {
+//                 fade_states[ch].active = false;
+//             }
+
+//             dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+//             for (int i = 1; i < DMX_UNIVERSE_SIZE; ++i)
+//             {
+//                 if (dmx_data[i] != 0)
+//                 {
+//                     ESP_LOGI(TAG, "DMX-Daten aktualisiert, Kanal %d = %d", i, dmx_data[i]);
+//                     break;
+//                 }
+//             }
+//         }
+//         else if (len > 4 && strncmp(rx_buffer, "DMX", 3) == 0)
+//         {
+//             rx_buffer[len] = '\0';
+//             ESP_LOGI(TAG, "Empfangenes Kommando: %s", rx_buffer);
+//             blink_debug_led(1, 20);
+
+//             char *type = strtok(rx_buffer + 3, "#");
+//             char *arg1 = strtok(NULL, "#");
+//             char *arg2 = strtok(NULL, "#");
+//             char *arg3 = strtok(NULL, "#");
+
+//             if (type && arg1)
+//             {
+//                 char mode = type[0];
+//                 int channel = atoi(type + 1);
+//                 int value = atoi(arg1);
+//                 int speed = (arg2 ? atoi(arg2) : 255);
+//                 int fade_ms = speed_to_ms(speed);
+
+//                 if (channel >= 1 && channel < DMX_UNIVERSE_SIZE)
+//                 {
+//                     if (mode == 'R')
+//                     {
+//                         // value is expected to be R + G*1000 + B*1000000 (e.g. 3066012)
+//                         int rgb_value = value;
+//                         int r_percent = rgb_value % 1000;
+//                         int g_percent = (rgb_value / 1000) % 1000;
+//                         int b_percent = (rgb_value / 1000000) % 1000;
+
+//                         int r = (int)roundf(r_percent * 2.55f);
+//                         int g = (int)roundf(g_percent * 2.55f);
+//                         int b = (int)roundf(b_percent * 2.55f);
+
+//                         if (channel <= DMX_UNIVERSE_SIZE - 3)
+//                         {
+//                             if (fade_ms > 0)
+//                             {
+//                                 for (int i = 0; i < 3; i++)
+//                                 {
+//                                     fade_states[channel + i].start_value = dmx_data[channel + i];
+//                                     fade_states[channel + i].target_value = (i == 0) ? r : (i == 1) ? g
+//                                                                                                     : b;
+//                                     fade_states[channel + i].duration_ms = fade_ms;
+//                                     fade_states[channel + i].start_time = xTaskGetTickCount();
+//                                     fade_states[channel + i].active = true;
+//                                 }
+
+//                                 ESP_LOGI(TAG, "Fading RGB @%d → R=%d G=%d B=%d (%d ms)", channel, r, g, b, fade_ms);
+//                             }
+//                             else
+//                             {
+//                                 dmx_data[channel] = r;
+//                                 dmx_data[channel + 1] = g;
+//                                 dmx_data[channel + 2] = b;
+
+//                                 fade_states[channel].active = false;
+//                                 fade_states[channel + 1].active = false;
+//                                 fade_states[channel + 2].active = false;
+
+//                                 dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+//                                 ESP_LOGI(TAG, "RGB direkt gesetzt @%d → R=%d G=%d B=%d", channel, r, g, b);
+//                             }
+//                         }
+//                         else
+//                         {
+//                             ESP_LOGW(TAG, "Nicht genug Kanäle für RGB ab Kanal %d", channel);
+//                         }
+//                     }
+//                     else if (mode == 'W')
+//                     {
+//                         // Erwartet: 6-stelligen Wert WWWCW, z. B. 070050 für WW=70%, CW=50%
+
+//                         if (value < 0 || value > 100100)
+//                         {
+//                             ESP_LOGW(TAG, "Ungültiger W-Wert: %d", value);
+//                             return;
+//                         }
+
+//                         int ww_percent = value / 1000;
+//                         int cw_percent = value % 1000;
+
+//                         if (ww_percent > 100 || cw_percent > 100)
+//                         {
+//                             ESP_LOGW(TAG, "W-Wert außerhalb des Bereichs: WW=%d CW=%d", ww_percent, cw_percent);
+//                             return;
+//                         }
+
+//                         int ww = (int)roundf(ww_percent * 2.55f);
+//                         int cw = (int)roundf(cw_percent * 2.55f);
+
+//                         if (channel <= DMX_UNIVERSE_SIZE - 2)
+//                         {
+//                             if (fade_ms > 0)
+//                             {
+//                                 for (int i = 0; i < 2; i++)
+//                                 {
+//                                     fade_states[channel + i].start_value = dmx_data[channel + i];
+//                                     fade_states[channel + i].target_value = (i == 0) ? ww : cw;
+//                                     fade_states[channel + i].duration_ms = fade_ms;
+//                                     fade_states[channel + i].start_time = xTaskGetTickCount();
+//                                     fade_states[channel + i].active = true;
+//                                 }
+
+//                                 ESP_LOGI(TAG, "Fading TW @%d → WW=%d CW=%d (%d ms)", channel, ww, cw, fade_ms);
+//                             }
+//                             else
+//                             {
+//                                 dmx_data[channel] = ww;
+//                                 dmx_data[channel + 1] = cw;
+
+//                                 fade_states[channel].active = false;
+//                                 fade_states[channel + 1].active = false;
+
+//                                 dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+//                                 ESP_LOGI(TAG, "TW direkt gesetzt @%d → WW=%d CW=%d", channel, ww, cw);
+//                             }
+//                         }
+//                     }
+//                     else
+//                     {
+//                         int target_value = value;
+//                         if (mode == 'P')
+//                             target_value = (value * 255) / 100;
+//                         else if (mode == 'C')
+//                             target_value = value;
+
+//                         if (fade_ms > 0 && dmx_data[channel] != target_value)
+//                         {
+//                             fade_states[channel].start_value = dmx_data[channel];
+//                             fade_states[channel].target_value = target_value;
+//                             fade_states[channel].duration_ms = fade_ms;
+//                             fade_states[channel].start_time = xTaskGetTickCount();
+//                             fade_states[channel].active = true;
+
+//                             ESP_LOGI(TAG, "Fading Kanal %d von %d → %d in %d ms", channel, dmx_data[channel], target_value, fade_ms);
+//                         }
+//                         else
+//                         {
+//                             fade_states[channel].active = false;
+//                             dmx_data[channel] = target_value;
+//                             dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+//                             ESP_LOGI(TAG, "Kanal %d direkt auf %d gesetzt", channel, target_value);
+//                         }
+//                     }
+//                 }
+//             }
+
+//             else
+//             {
+//                 ESP_LOGW(TAG, "Falsche Paketlänge: %d", len);
+//             }
+//         }
+
+//         // close(sock);
+//         // vTaskDelete(NULL);
+//     }
+// }
 
 void app_main()
 {

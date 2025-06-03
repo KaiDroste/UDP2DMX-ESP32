@@ -1,6 +1,7 @@
 #CHATGPT Code als Vergleich
 Nicht lauffähig.- Switch
                       soll übernommen werden
+                          LED status task vergleichen
 
 #include <string.h>
 #include <stdlib.h>
