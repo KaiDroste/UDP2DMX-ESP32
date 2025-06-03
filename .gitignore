@@ -1,7 +1,7 @@
 
 # ESP-IDF build artifacts
 /build/*
-/CMakeFiles/
+/CMakeFiles/*
 /CMakeCache.txt
 /cmake_install.cmake
 /Makefile
