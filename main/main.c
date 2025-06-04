@@ -43,24 +43,24 @@ static bool dmx_error = false;
 //     }
 // }
 
-// static void led_status_task(void *arg)
-// {
-//     while (1)
-//     {
-//         if (!led_override_active)
-//         {
-//             int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
-//             gpio_set_level(DEBUG_LED_GPIO, dmx_error || !wifi_connected);
-//             vTaskDelay(pdMS_TO_TICKS(delay));
-//             gpio_set_level(DEBUG_LED_GPIO, 0);
-//             vTaskDelay(pdMS_TO_TICKS(delay));
-//         }
-//         else
-//         {
-//             vTaskDelay(pdMS_TO_TICKS(100)); // kurz warten, dann wieder prüfen
-//         }
-//     }
-// }
+static void led_status_task(void *arg)
+{
+    while (1)
+    {
+        if (!my_led_override_active())
+        {
+            int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
+            my_led_set(true); // LED an
+            vTaskDelay(pdMS_TO_TICKS(delay));
+            my_led_set(false); // LED aus
+            vTaskDelay(pdMS_TO_TICKS(delay));
+        }
+        else
+        {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+    }
+}
 
 typedef struct
 {
@@ -321,6 +321,7 @@ void app_main()
     // ESP_ERROR_CHECK(example_connect());
     // wifi_connected = true;
     my_led_set_wifi_status(true);
+    wifi_connected = my_wifi_is_connected();
 
     // DMX Setup
     dmx_config_t config = DMX_CONFIG_DEFAULT;
@@ -333,7 +334,7 @@ void app_main()
     // Tasks starten
     xTaskCreate(udp_server_task, "udp_server", 8192, NULL, 5, NULL);
     xTaskCreate(fade_task, "fade_task", 4096, NULL, 5, NULL);
-    // xTaskCreate(led_status_task, "led_status_task", 2048, NULL, 3, NULL);
+    xTaskCreate(led_status_task, "led_status_task", 2048, NULL, 3, NULL);
 
     ESP_LOGI(TAG, "System bereit – DMX aktiv & WiFi verbunden");
     // blink_debug_led(2, 200); // 2x blinken zur Bestätigung

@@ -18,6 +18,7 @@
 
 static const char *TAG = "wifi";
 
+bool my_wifi_is_connected(void);
 static int current_network = 0;
 
 typedef struct
