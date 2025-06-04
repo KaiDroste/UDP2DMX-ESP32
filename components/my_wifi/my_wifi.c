@@ -48,6 +48,8 @@ static void connect_to_wifi(int index)
     ESP_ERROR_CHECK(esp_wifi_connect());
 
     ESP_LOGI(TAG, "Verbinde mit SSID %s ...", wifi_configs[index].ssid);
+
+    my_led_set_wifi_status(true);
 }
 
 void wifi_switch_next_network(void)
@@ -84,7 +86,12 @@ void my_wifi_init(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_err_t err = esp_event_loop_create_default();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
+    {
+        ESP_LOGE(TAG, "Fehler beim Erstellen des Event Loops: %s", esp_err_to_name(err));
+        return;
+    }
 
     esp_netif_create_default_wifi_sta();
 

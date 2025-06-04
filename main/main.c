@@ -281,6 +281,7 @@ void udp_server_task(void *arg)
     while (1)
     {
         int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
+        ESP_LOGI(TAG, "UDP empfangen, Länge = %d", len);
         if (len == DMX_UNIVERSE_SIZE)
         {
             memcpy(dmx_data, rx_buffer, DMX_UNIVERSE_SIZE);

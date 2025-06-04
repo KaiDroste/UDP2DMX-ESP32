@@ -10,7 +10,7 @@ Todos:
 - [ ] Fading Ruckelt Eventuell lässt sich das noch mit Chatgpt ausdiskutieren? 
   - [ ] Fading ruckelt nur auf niedrigen Dimmstufen Kann an den Lampen oder Dimmern liegen lässt sich eventuell durch verschiedene Dimmkurven anpassen.
 - [ ] Fallback Wifi für Loxone einrichten
-- [ ] 
+- [ ] ESP DMX Netzwerknamen vergeben damit ich keine IP adresse mehr benötige
 
 
 
