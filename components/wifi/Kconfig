@@ -1,0 +1,27 @@
+menu "Wi-Fi Configuration"
+
+config WIFI_SSID_1
+    string "SSID network 1"
+    default "WLAN1"
+
+config WIFI_PASS_1
+    string "password  network 1"
+    default ""
+
+config WIFI_SSID_2
+    string "SSID network 2"
+    default "WLAN2"
+
+config WIFI_PASS_2
+    string "password  network 2"
+    default ""
+
+config WIFI_SSID_3
+    string "SSID network 3"
+    default "WLAN3"
+
+config WIFI_PASS_3
+    string "password  network 3"
+    default ""
+
+endmenu
