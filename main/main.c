@@ -15,6 +15,7 @@
 #include "driver/gpio.h"
 
 #include "my_wifi.h"
+#include "my_led.h"
 
 #define TX_PIN 17
 #define RX_PIN 16
@@ -31,35 +32,35 @@ static dmx_port_t dmx_num = DMX_NUM_1;
 static bool wifi_connected = false;
 static bool dmx_error = false;
 
-void blink_debug_led(int times, int delay_ms)
-{
-    for (int i = 0; i < times; ++i)
-    {
-        gpio_set_level(DEBUG_LED_GPIO, 1);
-        vTaskDelay(pdMS_TO_TICKS(delay_ms));
-        gpio_set_level(DEBUG_LED_GPIO, 0);
-        vTaskDelay(pdMS_TO_TICKS(delay_ms));
-    }
-}
+// void blink_debug_led(int times, int delay_ms)
+// {
+//     for (int i = 0; i < times; ++i)
+//     {
+//         gpio_set_level(DEBUG_LED_GPIO, 1);
+//         vTaskDelay(pdMS_TO_TICKS(delay_ms));
+//         gpio_set_level(DEBUG_LED_GPIO, 0);
+//         vTaskDelay(pdMS_TO_TICKS(delay_ms));
+//     }
+// }
 
-static void led_status_task(void *arg)
-{
-    while (1)
-    {
-        if (!led_override_active)
-        {
-            int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
-            gpio_set_level(DEBUG_LED_GPIO, dmx_error || !wifi_connected);
-            vTaskDelay(pdMS_TO_TICKS(delay));
-            gpio_set_level(DEBUG_LED_GPIO, 0);
-            vTaskDelay(pdMS_TO_TICKS(delay));
-        }
-        else
-        {
-            vTaskDelay(pdMS_TO_TICKS(100)); // kurz warten, dann wieder prüfen
-        }
-    }
-}
+// static void led_status_task(void *arg)
+// {
+//     while (1)
+//     {
+//         if (!led_override_active)
+//         {
+//             int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
+//             gpio_set_level(DEBUG_LED_GPIO, dmx_error || !wifi_connected);
+//             vTaskDelay(pdMS_TO_TICKS(delay));
+//             gpio_set_level(DEBUG_LED_GPIO, 0);
+//             vTaskDelay(pdMS_TO_TICKS(delay));
+//         }
+//         else
+//         {
+//             vTaskDelay(pdMS_TO_TICKS(100)); // kurz warten, dann wieder prüfen
+//         }
+//     }
+// }
 
 typedef struct
 {
@@ -290,7 +291,8 @@ void udp_server_task(void *arg)
         else if (len > 4 && strncmp(rx_buffer, "DMX", 3) == 0)
         {
             rx_buffer[len] = '\0';
-            blink_debug_led(1, 20);
+            // blink_debug_led(1, 20);
+            my_led_blink(1, 20);
             handle_udp_command(rx_buffer);
         }
     }
@@ -302,20 +304,22 @@ void app_main()
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // Debug LED konfigurieren
-    gpio_config_t io_conf = {
-        .pin_bit_mask = 1ULL << DEBUG_LED_GPIO,
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = 0,
-        .pull_down_en = 0,
-        .intr_type = GPIO_INTR_DISABLE};
-    gpio_config(&io_conf);
-    gpio_set_level(DEBUG_LED_GPIO, 1); // LED an beim Start
+    // // Debug LED konfigurieren
+    // gpio_config_t io_conf = {
+    //     .pin_bit_mask = 1ULL << DEBUG_LED_GPIO,
+    //     .mode = GPIO_MODE_OUTPUT,
+    //     .pull_up_en = 0,
+    //     .pull_down_en = 0,
+    //     .intr_type = GPIO_INTR_DISABLE};
+    // gpio_config(&io_conf);
+    // gpio_set_level(DEBUG_LED_GPIO, 1); // LED an beim Start
+    my_led_init(DEBUG_LED_GPIO);
 
     // WLAN verbinden
     my_wifi_init();
     // ESP_ERROR_CHECK(example_connect());
-    wifi_connected = true;
+    // wifi_connected = true;
+    my_led_set_wifi_status(true);
 
     // DMX Setup
     dmx_config_t config = DMX_CONFIG_DEFAULT;
@@ -328,10 +332,11 @@ void app_main()
     // Tasks starten
     xTaskCreate(udp_server_task, "udp_server", 8192, NULL, 5, NULL);
     xTaskCreate(fade_task, "fade_task", 4096, NULL, 5, NULL);
-    xTaskCreate(led_status_task, "led_status_task", 2048, NULL, 3, NULL);
+    // xTaskCreate(led_status_task, "led_status_task", 2048, NULL, 3, NULL);
 
     ESP_LOGI(TAG, "System bereit – DMX aktiv & WiFi verbunden");
-    blink_debug_led(2, 200); // 2x blinken zur Bestätigung
+    // blink_debug_led(2, 200); // 2x blinken zur Bestätigung
+    my_led_blink(2, 200);
 
     TickType_t last = xTaskGetTickCount();
     while (1)

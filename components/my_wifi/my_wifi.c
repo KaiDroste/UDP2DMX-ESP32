@@ -10,6 +10,7 @@
 #include "driver/gpio.h"
 
 #include "my_wifi.h"
+#include "my_led.h"
 #include "sdkconfig.h"
 
 #define MAX_NETWORKS 3
@@ -30,6 +31,11 @@ static wifi_config_entry_t wifi_configs[MAX_NETWORKS] = {
     {CONFIG_WIFI_SSID_2, CONFIG_WIFI_PASS_2},
     {CONFIG_WIFI_SSID_3, CONFIG_WIFI_PASS_3},
 };
+
+static void indicate_wifi_selection(int index)
+{
+    my_led_blink(index + 1, 150); // 1x für SSID_1, 2x für SSID_2 usw.
+}
 
 static void connect_to_wifi(int index)
 {
