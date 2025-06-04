@@ -9,10 +9,12 @@
 #include "esp_event.h"
 #include "nvs_flash.h"
 #include "esp_netif.h"
-#include "protocol_examples_common.h"
+// #include "protocol_examples_common.h"
 #include "lwip/sockets.h"
 #include "esp_dmx.h"
 #include "driver/gpio.h"
+
+#include "my_wifi.h"
 
 #define TX_PIN 17
 #define RX_PIN 16
@@ -44,11 +46,18 @@ static void led_status_task(void *arg)
 {
     while (1)
     {
-        int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
-        gpio_set_level(DEBUG_LED_GPIO, dmx_error || !wifi_connected);
-        vTaskDelay(pdMS_TO_TICKS(delay));
-        gpio_set_level(DEBUG_LED_GPIO, 0);
-        vTaskDelay(pdMS_TO_TICKS(delay));
+        if (!led_override_active)
+        {
+            int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
+            gpio_set_level(DEBUG_LED_GPIO, dmx_error || !wifi_connected);
+            vTaskDelay(pdMS_TO_TICKS(delay));
+            gpio_set_level(DEBUG_LED_GPIO, 0);
+            vTaskDelay(pdMS_TO_TICKS(delay));
+        }
+        else
+        {
+            vTaskDelay(pdMS_TO_TICKS(100)); // kurz warten, dann wieder prüfen
+        }
     }
 }
 
@@ -304,7 +313,8 @@ void app_main()
     gpio_set_level(DEBUG_LED_GPIO, 1); // LED an beim Start
 
     // WLAN verbinden
-    ESP_ERROR_CHECK(example_connect());
+    my_wifi_init();
+    // ESP_ERROR_CHECK(example_connect());
     wifi_connected = true;
 
     // DMX Setup
