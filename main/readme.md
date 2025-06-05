@@ -26,7 +26,7 @@ Make sure ESP-IDF v5.0 is installed and properly set up. For installation instru
 ### 2. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/udp2dmx-esp32.git
+git clone "link to this Repo"
 cd udp2dmx-esp32
 ```
 
