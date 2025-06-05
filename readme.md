@@ -112,7 +112,19 @@ The device expects UDP packets in the following formats:
 
 ---
 
+## 🔆 LED Behavior – Summary
 
+| Condition                               | LED Behavior                | Description                                   |
+| --------------------------------------- | --------------------------- | --------------------------------------------- |
+| **Wi-Fi connected**<br>**No DMX error** | **Off (constantly)**        | Normal operation                              |
+| **Wi-Fi disconnected**                  | **Slow blinking**           | 500 ms on / 500 ms off                        |
+| **DMX error active**                    | **Fast blinking**           | 100 ms on / 100 ms off                        |
+| **User action**<br>(e.g. Wi-Fi switch)  | **Short blinking sequence** | `n` blinks with `delay_ms` (e.g. 2× 50 ms)    |
+| **Network selection via button**        | **1–3 blinks**              | Number of blinks = selected network index + 1 |
+
+
+
+---
 ## 📋 Requirements
 
 - ESP32 board (e.g., ESP32 DevKitC)
