@@ -38,6 +38,21 @@ static void indicate_wifi_selection(int index)
     my_led_blink(index + 1, 150); // 1x für SSID_1, 2x für SSID_2 usw.
 }
 
+static void on_wifi_event(void *arg, esp_event_base_t event_base,
+                          int32_t event_id, void *event_data)
+{
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
+    {
+        ESP_LOGW("my_wifi", "WLAN getrennt");
+        my_led_set_wifi_status(false); // LED blinkt oder geht aus
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    {
+        ESP_LOGI("my_wifi", "WLAN verbunden – IP erhalten");
+        my_led_set_wifi_status(true); // LED zeigt WLAN-Verbindung
+    }
+}
+
 static void connect_to_wifi(int index)
 {
     wifi_config_t wifi_config = {};
@@ -98,6 +113,17 @@ void my_wifi_init(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_event_handler_instance_register(WIFI_EVENT,
+                                        ESP_EVENT_ANY_ID,
+                                        &on_wifi_event,
+                                        NULL,
+                                        NULL);
+    esp_event_handler_instance_register(IP_EVENT,
+                                        IP_EVENT_STA_GOT_IP,
+                                        &on_wifi_event,
+                                        NULL,
+                                        NULL);
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
 

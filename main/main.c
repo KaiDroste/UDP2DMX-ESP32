@@ -29,8 +29,8 @@
 static const char *TAG = "udp_dmx";
 static uint8_t dmx_data[DMX_UNIVERSE_SIZE] = {};
 static dmx_port_t dmx_num = DMX_NUM_1;
-static bool wifi_connected = false;
-static bool dmx_error = false;
+// static bool wifi_connected = false;
+// static bool dmx_error = false;
 
 // void blink_debug_led(int times, int delay_ms)
 // {
@@ -43,24 +43,24 @@ static bool dmx_error = false;
 //     }
 // }
 
-static void led_status_task(void *arg)
-{
-    while (1)
-    {
-        if (!my_led_override_active())
-        {
-            int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
-            my_led_set(true); // LED an
-            vTaskDelay(pdMS_TO_TICKS(delay));
-            my_led_set(false); // LED aus
-            vTaskDelay(pdMS_TO_TICKS(delay));
-        }
-        else
-        {
-            vTaskDelay(pdMS_TO_TICKS(100));
-        }
-    }
-}
+// static void led_status_task(void *arg)
+// {
+//     while (1)
+//     {
+//         if (!my_led_override_active())
+//         {
+//             int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
+//             my_led_set(true); // LED an
+//             vTaskDelay(pdMS_TO_TICKS(delay));
+//             my_led_set(false); // LED aus
+//             vTaskDelay(pdMS_TO_TICKS(delay));
+//         }
+//         else
+//         {
+//             vTaskDelay(pdMS_TO_TICKS(100));
+//         }
+//     }
+// }
 
 typedef struct
 {
@@ -320,8 +320,8 @@ void app_main()
     my_wifi_init();
     // ESP_ERROR_CHECK(example_connect());
     // wifi_connected = true;
-    my_led_set_wifi_status(true);
-    wifi_connected = my_wifi_is_connected();
+    // my_led_set_wifi_status(true);
+    // wifi_connected = my_wifi_is_connected();
 
     // DMX Setup
     dmx_config_t config = DMX_CONFIG_DEFAULT;
@@ -334,7 +334,7 @@ void app_main()
     // Tasks starten
     xTaskCreate(udp_server_task, "udp_server", 8192, NULL, 5, NULL);
     xTaskCreate(fade_task, "fade_task", 4096, NULL, 5, NULL);
-    xTaskCreate(led_status_task, "led_status_task", 2048, NULL, 3, NULL);
+    // xTaskCreate(led_status_task, "led_status_task", 2048, NULL, 3, NULL);
 
     ESP_LOGI(TAG, "System bereit – DMX aktiv & WiFi verbunden");
     // blink_debug_led(2, 200); // 2x blinken zur Bestätigung
