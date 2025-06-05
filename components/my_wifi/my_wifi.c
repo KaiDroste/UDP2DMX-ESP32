@@ -44,12 +44,12 @@ static void on_wifi_event(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
         ESP_LOGW("my_wifi", "WLAN getrennt");
-        my_led_set_wifi_status(false); // LED blinkt oder geht aus
+        my_led_set_wifi_status(false); // LED blinkt
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ESP_LOGI("my_wifi", "WLAN verbunden – IP erhalten");
-        my_led_set_wifi_status(true); // LED zeigt WLAN-Verbindung
+        my_led_set_wifi_status(true);
     }
 }
 
@@ -65,13 +65,14 @@ static void connect_to_wifi(int index)
 
     ESP_LOGI(TAG, "Verbinde mit SSID %s ...", wifi_configs[index].ssid);
 
-    my_led_set_wifi_status(true);
+    // my_led_set_wifi_status(true);
 }
 
 void wifi_switch_next_network(void)
 {
     current_network = (current_network + 1) % MAX_NETWORKS;
     connect_to_wifi(current_network);
+    indicate_wifi_selection(current_network);
 }
 
 static void button_task(void *arg)
