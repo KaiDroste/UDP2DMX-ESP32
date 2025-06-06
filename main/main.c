@@ -29,6 +29,7 @@
 static const char *TAG = "udp_dmx";
 static uint8_t dmx_data[DMX_UNIVERSE_SIZE] = {};
 static dmx_port_t dmx_num = DMX_NUM_1;
+static float last_rgb_ratio[DMX_UNIVERSE_SIZE][3] = {};
 // static bool wifi_connected = false;
 // static bool dmx_error = false;
 
@@ -73,7 +74,7 @@ typedef struct
 
 static fade_state_t fade_states[DMX_UNIVERSE_SIZE] = {};
 
-// Convert speed_S to milliseconds
+// Convert speed_S to milliseconds (Using Loxone protocol)
 static int speed_to_ms(int speed)
 {
     if (speed == 255)
@@ -173,6 +174,25 @@ static void set_channel(int ch, int value, int fade_ms)
     }
 }
 
+static void set_multi_channels_rgb_ratio(int ch, int max_val)
+{
+    if (ch + 3 > DMX_UNIVERSE_SIZE)
+        return;
+
+    int rgb[3] = {
+        roundf(last_rgb_ratio[ch][0] * max_val),
+        roundf(last_rgb_ratio[ch][1] * max_val),
+        roundf(last_rgb_ratio[ch][2] * max_val),
+    };
+
+    for (int i = 0; i < 3; ++i)
+    {
+        stop_fade(ch + i);
+        dmx_data[ch + i] = rgb[i];
+    }
+    dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+}
+
 static void set_multi_channels(int ch, int *values, int count, int fade_ms)
 {
     if (ch + count > DMX_UNIVERSE_SIZE)
@@ -225,12 +245,28 @@ static void handle_udp_command(const char *cmd)
     {
     case 'R':
     {
-        int r = roundf((val % 1000) * 2.55f);
-        int g = roundf(((val / 1000) % 1000) * 2.55f);
-        int b = roundf(((val / 1000000) % 1000) * 2.55f);
-        int rgb[3] = {r, g, b};
-        set_multi_channels(ch, rgb, 3, fade_ms);
+        // int r = roundf((val % 1000) * 2.55f);
+        // int g = roundf(((val / 1000) % 1000) * 2.55f);
+        // int b = roundf(((val / 1000000) % 1000) * 2.55f);
+        // int rgb[3] = {r, g, b};
+        // set_multi_channels(ch, rgb, 3, fade_ms);
+        // RGB-Werte aus Befehl extrahieren
+        int r = (val % 1000);
+        int g = ((val / 1000) % 1000);
+        int b = ((val / 1000000) % 1000);
+
+        float max_val = fmaxf(fmaxf(r, g), b);
+        if (max_val == 0)
+            max_val = 1;
+
+        last_rgb_ratio[ch][0] = r / max_val;
+        last_rgb_ratio[ch][1] = g / max_val;
+        last_rgb_ratio[ch][2] = b / max_val;
+
+        set_multi_channels_rgb_ratio(ch, 255);
         ESP_LOGI(TAG, "RGB %d: R=%d G=%d B=%d", ch, r, g, b);
+        // set_multi_channels(ch, rgb, 3, fade_ms);
+        // ESP_LOGI(TAG, "RGB %d: R=%d G=%d B=%d", ch, r, g, b);
         break;
     }
     case 'W':
