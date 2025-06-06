@@ -29,39 +29,6 @@
 static const char *TAG = "udp_dmx";
 static uint8_t dmx_data[DMX_UNIVERSE_SIZE] = {};
 static dmx_port_t dmx_num = DMX_NUM_1;
-static float last_rgb_ratio[DMX_UNIVERSE_SIZE][3] = {};
-// static bool wifi_connected = false;
-// static bool dmx_error = false;
-
-// void blink_debug_led(int times, int delay_ms)
-// {
-//     for (int i = 0; i < times; ++i)
-//     {
-//         gpio_set_level(DEBUG_LED_GPIO, 1);
-//         vTaskDelay(pdMS_TO_TICKS(delay_ms));
-//         gpio_set_level(DEBUG_LED_GPIO, 0);
-//         vTaskDelay(pdMS_TO_TICKS(delay_ms));
-//     }
-// }
-
-// static void led_status_task(void *arg)
-// {
-//     while (1)
-//     {
-//         if (!my_led_override_active())
-//         {
-//             int delay = dmx_error ? 100 : (!wifi_connected ? 500 : 1000);
-//             my_led_set(true); // LED an
-//             vTaskDelay(pdMS_TO_TICKS(delay));
-//             my_led_set(false); // LED aus
-//             vTaskDelay(pdMS_TO_TICKS(delay));
-//         }
-//         else
-//         {
-//             vTaskDelay(pdMS_TO_TICKS(100));
-//         }
-//     }
-// }
 
 typedef struct
 {
@@ -174,25 +141,6 @@ static void set_channel(int ch, int value, int fade_ms)
     }
 }
 
-static void set_multi_channels_rgb_ratio(int ch, int max_val)
-{
-    if (ch + 3 > DMX_UNIVERSE_SIZE)
-        return;
-
-    int rgb[3] = {
-        roundf(last_rgb_ratio[ch][0] * max_val),
-        roundf(last_rgb_ratio[ch][1] * max_val),
-        roundf(last_rgb_ratio[ch][2] * max_val),
-    };
-
-    for (int i = 0; i < 3; ++i)
-    {
-        stop_fade(ch + i);
-        dmx_data[ch + i] = rgb[i];
-    }
-    dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-}
-
 static void set_multi_channels(int ch, int *values, int count, int fade_ms)
 {
     if (ch + count > DMX_UNIVERSE_SIZE)
@@ -245,39 +193,34 @@ static void handle_udp_command(const char *cmd)
     {
     case 'R':
     {
-        // int r = roundf((val % 1000) * 2.55f);
-        // int g = roundf(((val / 1000) % 1000) * 2.55f);
-        // int b = roundf(((val / 1000000) % 1000) * 2.55f);
-        // int rgb[3] = {r, g, b};
-        // set_multi_channels(ch, rgb, 3, fade_ms);
-        // RGB-Werte aus Befehl extrahieren
         int r = (val % 1000);
         int g = ((val / 1000) % 1000);
         int b = ((val / 1000000) % 1000);
 
-        float max_val = fmaxf(fmaxf(r, g), b);
-        if (max_val == 0)
-            max_val = 1;
+        int rgb[3] = {r, g, b};
+        set_multi_channels(ch, rgb, 3, fade_ms);
 
-        last_rgb_ratio[ch][0] = r / max_val;
-        last_rgb_ratio[ch][1] = g / max_val;
-        last_rgb_ratio[ch][2] = b / max_val;
-
-        set_multi_channels_rgb_ratio(ch, 255);
-        ESP_LOGI(TAG, "RGB %d: R=%d G=%d B=%d", ch, r, g, b);
-        // set_multi_channels(ch, rgb, 3, fade_ms);
-        // ESP_LOGI(TAG, "RGB %d: R=%d G=%d B=%d", ch, r, g, b);
+        ESP_LOGI(TAG, "RGB %d: R=%d G=%d B=%d mit Fading %d ms", ch, r, g, b, fade_ms);
         break;
     }
     case 'W':
     {
-        int ww = roundf((val / 1000) * 2.55f);
-        int cw = roundf((val % 1000) * 2.55f);
+        // Werte direkt im Bereich 0–255 erwarten (z. B. WW=200, CW=55)
+        int ww = (val / 1000) % 1000;
+        int cw = val % 1000;
+
+        if (ww > 255)
+            ww = 255;
+        if (cw > 255)
+            cw = 255;
+
         int tw[2] = {ww, cw};
         set_multi_channels(ch, tw, 2, fade_ms);
-        ESP_LOGI(TAG, "TW %d: WW=%d CW=%d", ch, ww, cw);
+
+        ESP_LOGI(TAG, "TW %d: WW=%d CW=%d mit Fading %d ms", ch, ww, cw, fade_ms);
         break;
     }
+
     case 'P':
         val = (val * 255) / 100;
         // fall trough
