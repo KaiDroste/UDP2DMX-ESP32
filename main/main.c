@@ -205,14 +205,13 @@ static void handle_udp_command(const char *cmd)
     }
     case 'W':
     {
-        // Werte direkt im Bereich 0–255 erwarten (z. B. WW=200, CW=55)
+        // Erwartet WW und CW im Format WW*1000 + CW, z. B. 200055 → WW=200, CW=55
         int ww = (val / 1000) % 1000;
         int cw = val % 1000;
 
-        if (ww > 255)
-            ww = 255;
-        if (cw > 255)
-            cw = 255;
+        // Begrenzen auf gültigen DMX-Wertebereich [0–255]
+        ww = ww > 255 ? 255 : (ww < 0 ? 0 : ww);
+        cw = cw > 255 ? 255 : (cw < 0 ? 0 : cw);
 
         int tw[2] = {ww, cw};
         set_multi_channels(ch, tw, 2, fade_ms);
@@ -271,7 +270,7 @@ void udp_server_task(void *arg)
         else if (len > 4 && strncmp(rx_buffer, "DMX", 3) == 0)
         {
             rx_buffer[len] = '\0';
-            // blink_debug_led(1, 20);
+            ESP_LOGI(TAG, "DMX-Befehl empfangen: \"%s\"", rx_buffer); // ← Hier Logausgabe einfügen
             my_led_blink(1, 20);
             handle_udp_command(rx_buffer);
         }

@@ -1,0 +1,5 @@
+- [] 0-255 Werte wieder auf 0-100 % anpassen und skalieren
+- Webserver?
+  - Wifi
+  - IP
+- 

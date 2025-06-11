@@ -33,6 +33,22 @@ static wifi_config_entry_t wifi_configs[MAX_NETWORKS] = {
     {CONFIG_WIFI_SSID_3, CONFIG_WIFI_PASS_3},
 };
 
+static void connect_to_wifi(int index)
+{
+    wifi_config_t wifi_config = {};
+    strncpy((char *)wifi_config.sta.ssid, wifi_configs[index].ssid, sizeof(wifi_config.sta.ssid));
+    strncpy((char *)wifi_config.sta.password, wifi_configs[index].password, sizeof(wifi_config.sta.password));
+
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_disconnect());
+    vTaskDelay(pdMS_TO_TICKS(200));
+    ESP_ERROR_CHECK(esp_wifi_connect());
+
+    ESP_LOGI(TAG, "Verbinde mit SSID %s ...", wifi_configs[index].ssid);
+
+    // my_led_set_wifi_status(true);
+}
+
 static void indicate_wifi_selection(int index)
 {
     my_led_blink(index + 1, 150); // 1x für SSID_1, 2x für SSID_2 usw.
@@ -45,27 +61,14 @@ static void on_wifi_event(void *arg, esp_event_base_t event_base,
     {
         ESP_LOGW("my_wifi", "WLAN getrennt");
         my_led_set_wifi_status(false); // LED blinkt
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        connect_to_wifi(current_network);
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ESP_LOGI("my_wifi", "WLAN verbunden – IP erhalten");
         my_led_set_wifi_status(true);
     }
-}
-
-static void connect_to_wifi(int index)
-{
-    wifi_config_t wifi_config = {};
-    strncpy((char *)wifi_config.sta.ssid, wifi_configs[index].ssid, sizeof(wifi_config.sta.ssid));
-    strncpy((char *)wifi_config.sta.password, wifi_configs[index].password, sizeof(wifi_config.sta.password));
-
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_disconnect());
-    ESP_ERROR_CHECK(esp_wifi_connect());
-
-    ESP_LOGI(TAG, "Verbinde mit SSID %s ...", wifi_configs[index].ssid);
-
-    // my_led_set_wifi_status(true);
 }
 
 void wifi_switch_next_network(void)
