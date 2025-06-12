@@ -322,6 +322,7 @@ void app_main()
     memset(dmx_data, 0, sizeof(dmx_data));
     dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
 
+    spiffs_init();
     config_load_from_spiffs("/spiffs/config.json");
 
     // Tasks starten

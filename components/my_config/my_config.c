@@ -11,6 +11,26 @@ static const char *TAG = "config";
 int default_min_ct = 3500;
 int default_max_ct = 6700;
 
+void spiffs_init(void)
+{
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path = "/spiffs",
+        .partition_label = "spiffs",
+        .max_files = 5,
+        .format_if_mount_failed = true};
+
+    esp_err_t ret = esp_vfs_spiffs_register(&conf);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE("SPIFFS", "SPIFFS Mount fehlgeschlagen: %s", esp_err_to_name(ret));
+        return;
+    }
+
+    size_t total = 0, used = 0;
+    esp_spiffs_info("spiffs", &total, &used);
+    ESP_LOGI("SPIFFS", "SPIFFS total: %d, used: %d", total, used);
+}
+
 void config_load_ct_values(const char *json)
 {
     cJSON *root = cJSON_Parse(json);

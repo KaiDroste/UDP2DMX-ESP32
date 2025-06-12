@@ -63,6 +63,9 @@ Set the following options:
 ```bash
 idf.py build
 idf.py flash
+idf.py spiffs-flash
+
+
 ```
 
 ---
