@@ -1,0 +1,58 @@
+
+# ESP-IDF build artifacts
+/build/*
+/CMakeFiles/*
+/CMakeCache.txt
+/cmake_install.cmake
+/Makefile
+/managed_components/
+# ESP-IDF configuration files
+sdkconfig
+sdkconfig.old
+
+# Project-specific build artifacts
+*.bin
+*.elf
+*.map
+*.hex
+
+# IDF environment settings
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.env/
+.env.*.json
+
+# Generated partition tables, bootloaders, etc.
+*.bin
+*.elf
+*.map
+
+# # VS Code and CLion settings (optional)
+# .vscode/
+# .idea/
+
+# Backup files
+*~
+*.bak
+*.swp
+*.swo
+*.swn
+
+# Core dumps
+core
+*.core
+
+# Python virtual environments
+.venv/
+venv/
+
+# Platform-specific files
+.DS_Store
+Thumbs.db
+
+# Ninja build system (if used)
+.ninja_deps
+.ninja_log
+

@@ -1,0 +1,5 @@
+dependencies:
+  someweisguy/esp_dmx:
+    git: https://github.com/someweisguy/esp_dmx
+    version: '*'
+  espressif/mdns: '*'
