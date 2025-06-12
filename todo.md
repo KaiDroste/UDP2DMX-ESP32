@@ -4,4 +4,8 @@
   - IP
 - Lichtfarbe für jeden Kanal vorgeben (als json/textdatei) --> Dadurch kann der Wert von Loxone direkt übergeben werden
   - Prüfen ob diese Werte per UDP geschrieben werden können?
+  - W (15163) config: CT-Konfig für Kanäle 10/11 fehlt – Standardwerte 3400–6600 K verwendet
+  - Werte direkt per UDP schreiben (loxone Baustein zum Ausprobieren ergänzen)
+  - Wie können die Werte am einfachsten geändert werden? 
 - mDNS hostname in Menuconfig ergänzen
+- 

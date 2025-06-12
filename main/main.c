@@ -315,15 +315,16 @@ void app_main()
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+    my_led_init(DEBUG_LED_GPIO);
+    my_wifi_init();
+
+    // DMX Setup
     dmx_config_t config = DMX_CONFIG_DEFAULT;
     dmx_driver_install(dmx_num, &config, NULL, 0);
     dmx_set_pin(dmx_num, TX_PIN, RX_PIN, EN_PIN);
 
     memset(dmx_data, 0, sizeof(dmx_data));
     dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-
-    spiffs_init();
-    config_load_from_spiffs("/spiffs/config.json");
 
     // Tasks starten
     xTaskCreate(udp_server_task, "udp_server", 8192, NULL, 5, NULL);
@@ -332,6 +333,8 @@ void app_main()
     ESP_LOGI(TAG, "System bereit: DMX aktiv & WiFi verbunden");
     my_led_blink(2, 200);
 
+    spiffs_init();
+    config_load_from_spiffs("/spiffs/config.json");
     TickType_t last = xTaskGetTickCount();
     while (1)
     {
