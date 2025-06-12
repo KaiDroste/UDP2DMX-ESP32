@@ -2,4 +2,6 @@
 - Webserver?
   - Wifi
   - IP
-- 
+- Lichtfarbe für jeden Kanal vorgeben (als json/textdatei) --> Dadurch kann der Wert von Loxone direkt übergeben werden
+  - Prüfen ob diese Werte per UDP geschrieben werden können?
+- mDNS hostname in Menuconfig ergänzen

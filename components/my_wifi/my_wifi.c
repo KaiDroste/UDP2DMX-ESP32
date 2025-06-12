@@ -8,6 +8,7 @@
 #include "nvs_flash.h"
 #include "esp_netif.h"
 #include "driver/gpio.h"
+#include "mdns.h"
 
 #include "my_wifi.h"
 #include "my_led.h"
@@ -33,6 +34,13 @@ static wifi_config_entry_t wifi_configs[MAX_NETWORKS] = {
     {CONFIG_WIFI_SSID_3, CONFIG_WIFI_PASS_3},
 };
 
+void start_mdns_service(void)
+{
+    mdns_init();
+    mdns_hostname_set("udp2dmx");             // ergibt esp32.local
+    mdns_instance_name_set("DMX Controller"); // Name in der mDNS-Anfrage
+}
+
 static void connect_to_wifi(int index)
 {
     wifi_config_t wifi_config = {};
@@ -45,8 +53,6 @@ static void connect_to_wifi(int index)
     ESP_ERROR_CHECK(esp_wifi_connect());
 
     ESP_LOGI(TAG, "Verbinde mit SSID %s ...", wifi_configs[index].ssid);
-
-    // my_led_set_wifi_status(true);
 }
 
 static void indicate_wifi_selection(int index)
@@ -59,7 +65,9 @@ static void on_wifi_event(void *arg, esp_event_base_t event_base,
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        ESP_LOGW("my_wifi", "WLAN getrennt");
+        wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *)event_data;
+        ESP_LOGW("my_wifi", "WLAN getrennt (Grund %d)", disconn->reason);
+        // ESP_LOGW("my_wifi", "WLAN getrennt");
         my_led_set_wifi_status(false); // LED blinkt
         vTaskDelay(pdMS_TO_TICKS(2000));
         connect_to_wifi(current_network);
@@ -68,6 +76,8 @@ static void on_wifi_event(void *arg, esp_event_base_t event_base,
     {
         ESP_LOGI("my_wifi", "WLAN verbunden – IP erhalten");
         my_led_set_wifi_status(true);
+
+        start_mdns_service();
     }
 }
 
