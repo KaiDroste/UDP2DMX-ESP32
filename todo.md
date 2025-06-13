@@ -1,4 +1,4 @@
-- [] 0-255 Werte wieder auf 0-100 % anpassen und skalieren
+- [] 0-255 Werte wieder auf 0-100 % anpassen und skalieren --> Erstmal nicht notwendig da Lumitech verwendet wird. 
 - Webserver?
   - Wifi
   - IP

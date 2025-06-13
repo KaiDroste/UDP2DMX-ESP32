@@ -107,11 +107,13 @@ To use the gateway in your **Loxone Config**:
 
 The device expects UDP packets in the following formats:
 
-- **DMXP** — Set DMX value with optional fade  
-  Example: `DMXC1#255#10` → Set channel 1 to value 255 with fade time 10
-- **DMXC** — RGB control on 3 consecutive channels  
-  Example: `DMXR2#128128128` → Set channels 2, 3, 4 to RGB(128,128,128)
-
+| Type  | Format                               | Description                                                                                                                                   |
+| ----- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P** | `DMXP<ch>#<percent>#<fade>`          | Set a single channel to a value from 0–100% with optional fade (converted to 0–255 internally).                                               |
+| **C** | `DMXC<ch>#<value>#<fade>`            | Set a single channel (0–255) with optional fade time.                                                                                         |
+| **R** | `DMXR<ch>#<rgb>#<fade>`              | Set 3 consecutive channels for RGB values. Format: `RRRGGGBBB` (e.g., `128128128`).                                                           |
+| **W** | `DMXW<ch>#<wwcw>#<fade>`             | Set 2 consecutive channels for Tunable White. Format: `WWWCCC` (e.g., `200050` = WW:200, CW:50).                                              |
+| **L** | `DMXL<ch>#20<brightness><CT>#<fade>` | Set brightness and color temperature. Can be used with the Lumitech type from Loxone Format: `20BBBTTTT` (e.g., `200507000` = 50% at 7000 K). |
 
 ---
 

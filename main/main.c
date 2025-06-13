@@ -17,6 +17,7 @@
 #include "my_wifi.h"
 #include "my_led.h"
 #include "my_config.h"
+#include "config_handler.h"
 
 #define TX_PIN 17
 #define RX_PIN 16
@@ -335,6 +336,7 @@ void app_main()
 
     spiffs_init();
     config_load_from_spiffs("/spiffs/config.json");
+    start_rest_server();
     TickType_t last = xTaskGetTickCount();
     while (1)
     {
