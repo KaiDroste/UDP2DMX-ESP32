@@ -101,33 +101,42 @@ esp_err_t post_config_handler(httpd_req_t *req)
     httpd_resp_sendstr(req, "OK");
 
     config_load_from_spiffs(CONFIG_PATH);
+    ESP_LOGI(TAG, "Patch erfolgreich angewendet und geladen");
 
     return ESP_OK;
 }
 
 esp_err_t patch_config_handler(httpd_req_t *req)
 {
-    char buffer[2048];
     int total_len = req->content_len;
 
-    if (total_len >= sizeof(buffer))
+    if (total_len <= 0 || total_len > 8192) // Willkürliche Obergrenze als Schutz
     {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON zu groß");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Ungültige Länge");
         return ESP_FAIL;
     }
 
-    int ret = httpd_req_recv(req, buffer, total_len);
+    char *buf = malloc(total_len + 1);
+    if (!buf)
+    {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Speicherfehler");
+        return ESP_FAIL;
+    }
+
+    int ret = httpd_req_recv(req, buf, total_len);
     if (ret <= 0)
     {
+        free(buf);
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
-    buffer[ret] = '\0';
+    buf[ret] = '\0';
 
-    // Lade bestehende Konfiguration
+    // Bestehende Konfiguration laden
     char *existing_json = read_file(CONFIG_PATH);
     if (!existing_json)
     {
+        free(buf);
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
@@ -136,11 +145,13 @@ esp_err_t patch_config_handler(httpd_req_t *req)
     free(existing_json);
     if (!root)
     {
+        free(buf);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Bestehendes JSON fehlerhaft");
         return ESP_FAIL;
     }
 
-    cJSON *patch = cJSON_Parse(buffer);
+    cJSON *patch = cJSON_Parse(buf);
+    free(buf);
     if (!patch)
     {
         cJSON_Delete(root);
@@ -148,7 +159,7 @@ esp_err_t patch_config_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    // Füge/ersetze ct_config-Werte
+    // ct_config Patch anwenden
     cJSON *patch_ct = cJSON_GetObjectItem(patch, "ct_config");
     if (cJSON_IsObject(patch_ct))
     {
@@ -177,34 +188,57 @@ esp_err_t patch_config_handler(httpd_req_t *req)
         }
     }
 
-    // Füge/ersetze default_ct
+    // default_ct Patch anwenden
     cJSON *patch_default = cJSON_GetObjectItem(patch, "default_ct");
     if (cJSON_IsObject(patch_default))
     {
         cJSON *root_default = cJSON_GetObjectItem(root, "default_ct");
-        if (!root_default)
+        if (!cJSON_IsObject(root_default))
         {
+            // Existiert nicht oder ist kein Objekt → neu erstellen
+            cJSON_DeleteItemFromObject(root, "default_ct"); // sichergehen, dass es weg ist
             root_default = cJSON_CreateObject();
             cJSON_AddItemToObject(root, "default_ct", root_default);
         }
 
         cJSON *min_item = cJSON_GetObjectItem(patch_default, "min");
         cJSON *max_item = cJSON_GetObjectItem(patch_default, "max");
-
         if (cJSON_IsNumber(min_item))
         {
-            cJSON_ReplaceItemInObject(root_default, "min", cJSON_Duplicate(min_item, 1));
+            if (!cJSON_HasObjectItem(root_default, "min"))
+            {
+                cJSON_AddNumberToObject(root_default, "min", min_item->valuedouble);
+            }
+            else
+            {
+                cJSON_ReplaceItemInObject(root_default, "min", cJSON_Duplicate(min_item, 1));
+            }
         }
+
         if (cJSON_IsNumber(max_item))
         {
-            cJSON_ReplaceItemInObject(root_default, "max", cJSON_Duplicate(max_item, 1));
+            if (!cJSON_HasObjectItem(root_default, "max"))
+            {
+                cJSON_AddNumberToObject(root_default, "max", max_item->valuedouble);
+            }
+            else
+            {
+                cJSON_ReplaceItemInObject(root_default, "max", cJSON_Duplicate(max_item, 1));
+            }
         }
     }
 
     cJSON_Delete(patch);
 
     char *updated_json = cJSON_Print(root);
+    ESP_LOGD(TAG, "Aktualisierte JSON-Konfiguration:\n%s", updated_json);
     cJSON_Delete(root);
+
+    if (!updated_json)
+    {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
 
     if (save_json(CONFIG_PATH, updated_json) != ESP_OK)
     {
@@ -224,6 +258,7 @@ esp_err_t patch_config_handler(httpd_req_t *req)
 void start_rest_server(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = 8192;
 
     httpd_handle_t server = NULL;
     if (httpd_start(&server, &config) == ESP_OK)

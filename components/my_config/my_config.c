@@ -34,6 +34,8 @@ void spiffs_init(void)
 void config_load_ct_values(const char *json)
 {
     cJSON *root = cJSON_Parse(json);
+    // default_min_ct = 0;
+    // default_max_ct = 0;
     if (!root)
     {
         ESP_LOGE(TAG, "JSON-Parsing fehlgeschlagen");
@@ -87,8 +89,27 @@ void config_load_ct_values(const char *json)
             ESP_LOGW(TAG, "Standard-CT-Werte waren vertauscht – wurden korrigiert");
         }
 
-        ESP_LOGI(TAG, "Standard-CT-Werte: min=%d K, max=%d K", default_min_ct, default_max_ct);
+        if (cJSON_IsNumber(min_item))
+        {
+            default_min_ct = min_item->valueint;
+            ESP_LOGI(TAG, "Standard-CT min gesetzt auf %d K", default_min_ct);
+        }
+        else
+        {
+            ESP_LOGW(TAG, "default_ct.min fehlt oder ungültig");
+        }
+
+        if (cJSON_IsNumber(max_item))
+        {
+            default_max_ct = max_item->valueint;
+            ESP_LOGI(TAG, "Standard-CT max gesetzt auf %d K", default_max_ct);
+        }
+        else
+        {
+            ESP_LOGW(TAG, "default_ct.max fehlt oder ungültig");
+        }
     }
+    ESP_LOGD(TAG, "Geladene Standardwerte nach Patch: min=%d, max=%d", default_min_ct, default_max_ct);
 
     cJSON_Delete(root);
 }

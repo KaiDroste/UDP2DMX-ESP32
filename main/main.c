@@ -312,6 +312,8 @@ void udp_server_task(void *arg)
 
 void app_main()
 {
+    esp_log_level_set("wifi", ESP_LOG_DEBUG);
+    esp_log_level_set("event", ESP_LOG_DEBUG);
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
