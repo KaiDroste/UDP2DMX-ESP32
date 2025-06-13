@@ -7,5 +7,9 @@
   - W (15163) config: CT-Konfig für Kanäle 10/11 fehlt – Standardwerte 3400–6600 K verwendet
   - Werte direkt per UDP schreiben (loxone Baustein zum Ausprobieren ergänzen)
   - Wie können die Werte am einfachsten geändert werden? 
-- mDNS hostname in Menuconfig ergänzen
+- mDNS hostname in Menuconfig ergänzen /oder besser in config.json festlegen
+- Menuconfig (an readme anpassen)
+  - DMX config 
+  - LED config
+  - Button Config
 - 
