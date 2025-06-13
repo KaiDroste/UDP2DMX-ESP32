@@ -18,6 +18,7 @@
 #define WIFI_SWITCH_BUTTON_GPIO CONFIG_WIFI_SWITCH_BUTTON_GPIO
 
 static const char *TAG = "wifi";
+static const char *hostname = "udp2dmx";
 
 bool my_wifi_is_connected(void);
 static int current_network = 0;
@@ -37,7 +38,8 @@ static wifi_config_entry_t wifi_configs[MAX_NETWORKS] = {
 void start_mdns_service(void)
 {
     mdns_init();
-    mdns_hostname_set("udp2dmx");             // ergibt esp32.local
+    mdns_hostname_set(hostname); // ergibt esp32.local
+    ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", hostname);
     mdns_instance_name_set("DMX Controller"); // Name in der mDNS-Anfrage
 }
 
