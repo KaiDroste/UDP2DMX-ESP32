@@ -242,20 +242,25 @@ static void handle_udp_command(const char *cmd)
         if (color_temp > ct_cw)
             color_temp = ct_cw;
 
-        // 4) DMX-Werte exakt berechnen mit Sonderfallbehandlung
+        // 4) Entscheidung: welcher Kanal bekommt wie viel?
         int val_ww = 0, val_cw = 0;
-        if (color_temp == ct_ww)
+        int value = brightness * 255 / 100;
+
+        if (color_temp <= ct_ww + 100)
         {
-            val_ww = brightness * 255 / 100;
+            // fast ganz warm → nur WW an
+            val_ww = value;
             val_cw = 0;
         }
-        else if (color_temp == ct_cw)
+        else if (color_temp >= ct_cw - 100)
         {
+            // fast ganz kalt → nur CW an
             val_ww = 0;
-            val_cw = brightness * 255 / 100;
+            val_cw = value;
         }
-        else if (ct_cw > ct_ww)
+        else
         {
+            // Mischfarbe → normal berechnen
             int range = ct_cw - ct_ww;
             long num_cw = (long)brightness * (color_temp - ct_ww) * 255;
             long num_ww = (long)brightness * (ct_cw - color_temp) * 255;
@@ -264,10 +269,9 @@ static void handle_udp_command(const char *cmd)
             val_cw = (int)((num_cw + den / 2) / den);
             val_ww = (int)((num_ww + den / 2) / den);
 
-            // 4b) Rundungsartefakte vermeiden: sehr kleine Werte auf 0 setzen
-            if (val_cw < 2)
+            if (val_cw * 100 / 255 < 2)
                 val_cw = 0;
-            if (val_ww < 2)
+            if (val_ww * 100 / 255 < 2)
                 val_ww = 0;
         }
 
