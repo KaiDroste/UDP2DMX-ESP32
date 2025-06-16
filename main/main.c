@@ -220,38 +220,42 @@ static void handle_udp_command(const char *cmd)
     }
     case 'L':
     {
-        // Erwartet: val = 20xxxxxxx (Präfix 20, Helligkeit 3-stellig, Farbtemp 4-stellig)
         if (val < 200000000 || val > 209999999)
         {
             ESP_LOGW(TAG, "Ungültiges L-Kommando: %d", val);
             break;
         }
 
-        int brightness = (val / 10000) % 1000; // z. B. 050
-        int color_temp = val % 10000;          // z. B. 6700
+        int brightness = (val / 10000) % 1000;
+        int color_temp = val % 10000;
 
-        // Begrenzungen
         if (brightness < 0)
             brightness = 0;
         if (brightness > 100)
             brightness = 100;
-        int min_ct, max_ct;
-        get_ct_range(ch, &min_ct, &max_ct);
 
-        if (color_temp < min_ct)
-            color_temp = min_ct;
-        if (color_temp > max_ct)
-            color_temp = max_ct;
+        int ct_ww, ct_cw, ch_ww, ch_cw;
+        get_ct_sorted(ch, &ct_ww, &ct_cw, &ch_ww, &ch_cw);
 
-        // Verhältnis WW/CW berechnen
-        float ratio = (float)(color_temp - min_ct) / (max_ct - min_ct);
-        int cw = (int)(brightness * ratio * 2.55f); // 0–255
-        int ww = (int)(brightness * (1.0f - ratio) * 2.55f);
+        if (color_temp < ct_ww)
+            color_temp = ct_ww;
+        if (color_temp > ct_cw)
+            color_temp = ct_cw;
 
-        int tw[2] = {ww, cw};
-        set_multi_channels(ch, tw, 2, fade_ms);
+        float ratio = (float)(color_temp - ct_ww) / (ct_cw - ct_ww);
+        int val_cw = (int)(brightness * ratio * 2.55f);
+        int val_ww = (int)(brightness * (1.0f - ratio) * 2.55f);
 
-        ESP_LOGI(TAG, "Lichtfarbe %dK, Helligkeit %d%% → WW=%d CW=%d (Kanal %d+%d)", color_temp, brightness, ww, cw, ch, ch + 1);
+        // Multi-Channel-Array vorbereiten (WW/CW in richtiger Position)
+        int start_ch = (ch_ww < ch_cw) ? ch_ww : ch_cw;
+        int values[2];
+        values[ch_ww - start_ch] = val_ww;
+        values[ch_cw - start_ch] = val_cw;
+
+        set_multi_channels(start_ch, values, 2, fade_ms);
+
+        ESP_LOGI(TAG, "Lichtfarbe %dK, Helligkeit %d%% → WW=%d (CH%d), CW=%d (CH%d)",
+                 color_temp, brightness, val_ww, ch_ww, val_cw, ch_cw);
         break;
     }
     case 'P':

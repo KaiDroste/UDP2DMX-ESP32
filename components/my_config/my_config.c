@@ -175,3 +175,36 @@ void get_ct_range(int ch, int *min_ct, int *max_ct)
         ESP_LOGW(TAG, "CT-Konfig für Kanäle %d/%d fehlt – Standardwerte %d–%d K verwendet", ch, ch + 1, *min_ct, *max_ct);
     }
 }
+
+void get_ct_sorted(int ch, int *ct_ww, int *ct_cw, int *ch_ww, int *ch_cw)
+{
+    int cta = (ch >= 1 && ch < MAX_CHANNELS) ? ct_config[ch] : 0;
+    int ctb = (ch + 1 >= 1 && ch + 1 < MAX_CHANNELS) ? ct_config[ch + 1] : 0;
+
+    if (!cta)
+    {
+        ESP_LOGW(TAG, "CT für Kanal %d fehlt – Standard %d K verwendet", ch, default_min_ct);
+        cta = default_min_ct;
+    }
+
+    if (!ctb)
+    {
+        ESP_LOGW(TAG, "CT für Kanal %d fehlt – Standard %d K verwendet", ch + 1, default_max_ct);
+        ctb = default_max_ct;
+    }
+
+    if (cta < ctb)
+    {
+        *ct_ww = cta;
+        *ct_cw = ctb;
+        *ch_ww = ch;
+        *ch_cw = ch + 1;
+    }
+    else
+    {
+        *ct_ww = ctb;
+        *ct_cw = cta;
+        *ch_ww = ch + 1;
+        *ch_cw = ch;
+    }
+}
