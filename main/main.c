@@ -226,38 +226,65 @@ static void handle_udp_command(const char *cmd)
             break;
         }
 
+        // 1) Soll-Helligkeit (0–100) und Soll-CT (z.B. 2700…6500) extrahieren
         int brightness = (val / 10000) % 1000;
         int color_temp = val % 10000;
 
-        if (brightness < 0)
-            brightness = 0;
-        if (brightness > 100)
-            brightness = 100;
+        brightness = brightness < 0 ? 0 : (brightness > 100 ? 100 : brightness);
 
+        // 2) WW/CW nach tatsächlicher CT sortieren
         int ct_ww, ct_cw, ch_ww, ch_cw;
         get_ct_sorted(ch, &ct_ww, &ct_cw, &ch_ww, &ch_cw);
 
+        // 3) Soll-CT auf erlaubten Bereich clampen
         if (color_temp < ct_ww)
             color_temp = ct_ww;
         if (color_temp > ct_cw)
             color_temp = ct_cw;
 
-        float ratio = (float)(color_temp - ct_ww) / (ct_cw - ct_ww);
-        int val_cw = (int)(brightness * ratio * 2.55f);
-        int val_ww = (int)(brightness * (1.0f - ratio) * 2.55f);
+        // 4) DMX-Werte exakt berechnen mit Sonderfallbehandlung
+        int val_ww = 0, val_cw = 0;
+        if (color_temp == ct_ww)
+        {
+            val_ww = brightness * 255 / 100;
+            val_cw = 0;
+        }
+        else if (color_temp == ct_cw)
+        {
+            val_ww = 0;
+            val_cw = brightness * 255 / 100;
+        }
+        else if (ct_cw > ct_ww)
+        {
+            int range = ct_cw - ct_ww;
+            long num_cw = (long)brightness * (color_temp - ct_ww) * 255;
+            long num_ww = (long)brightness * (ct_cw - color_temp) * 255;
+            long den = (long)range * 100;
 
-        // Multi-Channel-Array vorbereiten (WW/CW in richtiger Position)
-        int start_ch = (ch_ww < ch_cw) ? ch_ww : ch_cw;
-        int values[2];
+            val_cw = (int)((num_cw + den / 2) / den);
+            val_ww = (int)((num_ww + den / 2) / den);
+
+            // 4b) Rundungsartefakte vermeiden: sehr kleine Werte auf 0 setzen
+            if (val_cw < 2)
+                val_cw = 0;
+            if (val_ww < 2)
+                val_ww = 0;
+        }
+
+        // 5) Array für set_multi_channels aufbauen
+        int start_ch = (ch_ww < ch_cw ? ch_ww : ch_cw);
+        int values[2] = {0, 0};
         values[ch_ww - start_ch] = val_ww;
         values[ch_cw - start_ch] = val_cw;
 
+        // 6) abschicken
         set_multi_channels(start_ch, values, 2, fade_ms);
 
         ESP_LOGI(TAG, "Lichtfarbe %dK, Helligkeit %d%% → WW=%d (CH%d), CW=%d (CH%d)",
                  color_temp, brightness, val_ww, ch_ww, val_cw, ch_cw);
         break;
     }
+
     case 'P':
         val = (val * 255) / 100;
         __attribute__((fallthrough));

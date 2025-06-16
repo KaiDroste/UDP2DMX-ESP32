@@ -178,33 +178,42 @@ void get_ct_range(int ch, int *min_ct, int *max_ct)
 
 void get_ct_sorted(int ch, int *ct_ww, int *ct_cw, int *ch_ww, int *ch_cw)
 {
-    int cta = (ch >= 1 && ch < MAX_CHANNELS) ? ct_config[ch] : 0;
-    int ctb = (ch + 1 >= 1 && ch + 1 < MAX_CHANNELS) ? ct_config[ch + 1] : 0;
+    int ct1 = (ch >= 0 && ch < MAX_CHANNELS) ? ct_config[ch] : 0;
+    int ct2 = (ch + 1 >= 0 && ch + 1 < MAX_CHANNELS) ? ct_config[ch + 1] : 0;
 
-    if (!cta)
+    int ch1 = ch;
+    int ch2 = ch + 1;
+
+    // Fallback bei fehlender Konfiguration
+    if (ct1 == 0 && ct2 == 0)
     {
-        ESP_LOGW(TAG, "CT für Kanal %d fehlt – Standard %d K verwendet", ch, default_min_ct);
-        cta = default_min_ct;
+        ct1 = default_min_ct;
+        ct2 = default_max_ct;
+        ESP_LOGW(TAG, "CT für beide Kanäle %d/%d fehlt – Standard %dK/%dK verwendet", ch1, ch2, ct1, ct2);
+    }
+    else if (ct1 == 0)
+    {
+        ct1 = default_min_ct;
+        ESP_LOGW(TAG, "CT für Kanal %d fehlt – Standard %dK verwendet", ch1, ct1);
+    }
+    else if (ct2 == 0)
+    {
+        ct2 = default_max_ct;
+        ESP_LOGW(TAG, "CT für Kanal %d fehlt – Standard %dK verwendet", ch2, ct2);
     }
 
-    if (!ctb)
+    if (ct1 <= ct2)
     {
-        ESP_LOGW(TAG, "CT für Kanal %d fehlt – Standard %d K verwendet", ch + 1, default_max_ct);
-        ctb = default_max_ct;
-    }
-
-    if (cta < ctb)
-    {
-        *ct_ww = cta;
-        *ct_cw = ctb;
-        *ch_ww = ch;
-        *ch_cw = ch + 1;
+        *ct_ww = ct1;
+        *ch_ww = ch1;
+        *ct_cw = ct2;
+        *ch_cw = ch2;
     }
     else
     {
-        *ct_ww = ctb;
-        *ct_cw = cta;
-        *ch_ww = ch + 1;
-        *ch_cw = ch;
+        *ct_ww = ct2;
+        *ch_ww = ch2;
+        *ct_cw = ct1;
+        *ch_cw = ch1;
     }
 }
