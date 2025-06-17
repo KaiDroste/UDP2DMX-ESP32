@@ -67,7 +67,6 @@ esp_err_t post_config_handler(httpd_req_t *req)
 {
     char buffer[2048];
     int total_len = req->content_len;
-    int received = 0;
 
     if (total_len >= sizeof(buffer))
     {
