@@ -3,6 +3,8 @@
 #include "esp_spiffs.h"
 #include <stdio.h>
 
+#include "my_wifi.h"
+
 #define MAX_CHANNELS 512
 static int ct_config[MAX_CHANNELS]; // 0 = nicht gesetzt
 
@@ -31,11 +33,26 @@ void spiffs_init(void)
     ESP_LOGI("SPIFFS", "SPIFFS total: %d, used: %d", total, used);
 }
 
+void config_set_hostname(const char *json)
+{
+    cJSON *root = cJSON_Parse(json);
+    if (!root)
+    {
+        ESP_LOGE(TAG, "JSON-Parsing fehlgeschlagen");
+        return;
+    }
+
+    cJSON *hostname_item = cJSON_GetObjectItem(root, "hostname");
+    if (cJSON_IsString(hostname_item))
+    {
+        ESP_LOGI("config", "Hostname gesetzt auf: %s", hostname_item->valuestring);
+        my_wifi_set_hostname(hostname_item->valuestring); 
+    }
+}
+
 void config_load_ct_values(const char *json)
 {
     cJSON *root = cJSON_Parse(json);
-    // default_min_ct = 0;
-    // default_max_ct = 0;
     if (!root)
     {
         ESP_LOGE(TAG, "JSON-Parsing fehlgeschlagen");
@@ -140,6 +157,7 @@ void config_load_from_spiffs(const char *path)
     fclose(f);
 
     config_load_ct_values(buffer);
+    config_set_hostname(buffer);
     free(buffer);
 }
 

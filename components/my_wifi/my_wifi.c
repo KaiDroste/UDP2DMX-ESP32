@@ -19,7 +19,8 @@
 
 static const char *TAG = "wifi";
 static bool is_connecting = false;
-static const char *hostname = "udp2dmx";
+// static const char *hostname = "udp2dmx";
+static char current_hostname[32] = "udp2dmx";
 
 bool my_wifi_is_connected(void);
 static int current_network = 0;
@@ -38,11 +39,36 @@ static wifi_config_entry_t wifi_configs[MAX_NETWORKS] = {
     {CONFIG_WIFI_SSID_3, CONFIG_WIFI_PASS_3},
 };
 
+void my_wifi_set_hostname(const char *new_hostname)
+{
+    if (!new_hostname || strlen(new_hostname) >= sizeof(current_hostname))
+        return;
+
+    strncpy(current_hostname, new_hostname, sizeof(current_hostname));
+    current_hostname[sizeof(current_hostname) - 1] = '\0';
+
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif) {
+        esp_netif_set_hostname(netif, current_hostname);
+        ESP_LOGI(TAG, "Hostname aktualisiert auf: %s", current_hostname);
+    }
+
+    // auch mDNS aktualisieren
+    mdns_hostname_set(current_hostname);
+}
+
+// const char *my_wifi_get_hostname(void)
+// {
+//     return current_hostname;
+// }
+
 void start_mdns_service(void)
 {
     mdns_init();
-    mdns_hostname_set(hostname); // ergibt esp32.local
-    ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", hostname);
+    mdns_hostname_set(current_hostname); // ergibt esp32.local
+    // mdns_hostname_set(hostname); // ergibt esp32.local
+    // ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", hostname);
+    ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", current_hostname);
     mdns_instance_name_set("DMX Controller"); // Name in der mDNS-Anfrage
 }
 

@@ -5,6 +5,6 @@ endif()
 idf_component_register(
     SRCS "my_config.c"
     INCLUDE_DIRS "include"
-    REQUIRES driver json spiffs
+    REQUIRES driver json spiffs my_wifi
 )
 message(STATUS "my_config component being included")

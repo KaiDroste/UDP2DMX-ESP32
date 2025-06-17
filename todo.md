@@ -2,10 +2,10 @@
   - Wifi
   - IP
 
-- mDNS hostname in Menuconfig ergänzen /oder besser in config.json festlegen
-- Menuconfig (an readme anpassen)
+- [x] mDNS hostname in Menuconfig ergänzen /oder besser in config.json festlegen
+  Prüfen!
+
+- Menuconfig (an readme anpassen) (Zur Anpasung der PINs)
   - DMX config 
   - LED config
   - Button Config
-
-- Momentan ist immer der kleinere Kanal warm und n+1 Kaltweiß. Die Einstellungen in der Config ändern das nicht. Theoretisch müsste das aber über die config eingestellt werden können. (Ausprobieren!)
