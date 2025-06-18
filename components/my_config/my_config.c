@@ -35,6 +35,7 @@ void spiffs_init(void)
 
 void config_set_hostname(const char *json)
 {
+    ESP_LOGI(TAG, "Hostname aus JSON setzen\n  %s", json);
     cJSON *root = cJSON_Parse(json);
     if (!root)
     {
@@ -46,7 +47,7 @@ void config_set_hostname(const char *json)
     if (cJSON_IsString(hostname_item))
     {
         ESP_LOGI("config", "Hostname gesetzt auf: %s", hostname_item->valuestring);
-        my_wifi_set_hostname(hostname_item->valuestring); 
+        my_wifi_set_hostname(hostname_item->valuestring);
     }
 }
 
