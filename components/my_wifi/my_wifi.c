@@ -44,16 +44,33 @@ void my_wifi_set_hostname(const char *new_hostname)
     if (!new_hostname || strlen(new_hostname) >= sizeof(current_hostname))
         return;
 
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (!netif) {
+        ESP_LOGW(TAG, "Netif-Handle konnte nicht geholt werden.");
+        return;
+    }
+
+    const char *old_hostname = esp_netif_get_hostname(netif);
+    if (old_hostname && strcmp(old_hostname, new_hostname) == 0) {
+        ESP_LOGI(TAG, "Hostname ist bereits gesetzt: %s", old_hostname);
+        return;
+    }
+
+    esp_err_t err = esp_netif_set_hostname(netif, new_hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Hostname konnte nicht gesetzt werden: %s", esp_err_to_name(err));
+        return;
+    }
+
+    // Update interne Variable
     strncpy(current_hostname, new_hostname, sizeof(current_hostname));
     current_hostname[sizeof(current_hostname) - 1] = '\0';
 
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (netif) {
-        esp_netif_set_hostname(netif, current_hostname);
-        ESP_LOGI(TAG, "Hostname aktualisiert auf: %s", current_hostname);
-    }
+    ESP_LOGI(TAG, "Hostname aktualisiert auf: %s", current_hostname);
 
     // auch mDNS aktualisieren
+    mdns_free();
+    mdns_init();
     mdns_hostname_set(current_hostname);
 }
 
