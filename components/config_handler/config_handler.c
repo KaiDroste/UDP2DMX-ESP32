@@ -29,13 +29,6 @@ void cjson_merge_objects(cJSON *target, const cJSON *patch)
                 cJSON_AddItemToObject(target, entry->string, cJSON_Duplicate(entry, 1));
             }
 
-            // // Spezielle Felder behandeln
-            // if (strcmp(entry->string, "hostname") == 0 && cJSON_IsString(entry)) {
-            //     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-            //     if (netif) {
-            //         esp_netif_set_hostname(netif, entry->valuestring);
-            //     }
-            // }
         }
     }
 }
