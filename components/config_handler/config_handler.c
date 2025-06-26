@@ -10,6 +10,37 @@
 static const char *TAG = "config_rest";
 static const char *CONFIG_PATH = "/spiffs/config.json";
 
+
+void cjson_merge_objects(cJSON *target, const cJSON *patch)
+{
+    const cJSON *entry = NULL;
+    cJSON_ArrayForEach(entry, patch)
+    {
+        cJSON *existing = cJSON_GetObjectItem(target, entry->string);
+
+        if (cJSON_IsObject(entry) && cJSON_IsObject(existing)) {
+            // Rekursiv mergen
+            cjson_merge_objects(existing, entry);
+        } else {
+            // Überschreiben oder neu einfügen
+            if (existing) {
+                cJSON_ReplaceItemInObject(target, entry->string, cJSON_Duplicate(entry, 1));
+            } else {
+                cJSON_AddItemToObject(target, entry->string, cJSON_Duplicate(entry, 1));
+            }
+
+            // // Spezielle Felder behandeln
+            // if (strcmp(entry->string, "hostname") == 0 && cJSON_IsString(entry)) {
+            //     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+            //     if (netif) {
+            //         esp_netif_set_hostname(netif, entry->valuestring);
+            //     }
+            // }
+        }
+    }
+}
+
+
 // Liest Datei und gibt sie als Zeichenkette zurück
 char *read_file(const char *path)
 {
@@ -158,76 +189,10 @@ esp_err_t patch_config_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    // ct_config Patch anwenden
-    cJSON *patch_ct = cJSON_GetObjectItem(patch, "ct_config");
-    if (cJSON_IsObject(patch_ct))
-    {
-        cJSON *root_ct = cJSON_GetObjectItem(root, "ct_config");
-        if (!root_ct)
-        {
-            root_ct = cJSON_CreateObject();
-            cJSON_AddItemToObject(root, "ct_config", root_ct);
-        }
-
-        cJSON *entry = NULL;
-        cJSON_ArrayForEach(entry, patch_ct)
-        {
-            if (cJSON_IsNumber(entry))
-            {
-                cJSON *existing = cJSON_GetObjectItem(root_ct, entry->string);
-                if (existing)
-                {
-                    existing->valuedouble = entry->valuedouble;
-                }
-                else
-                {
-                    cJSON_AddNumberToObject(root_ct, entry->string, entry->valuedouble);
-                }
-            }
-        }
-    }
-
-    // default_ct Patch anwenden
-    cJSON *patch_default = cJSON_GetObjectItem(patch, "default_ct");
-    if (cJSON_IsObject(patch_default))
-    {
-        cJSON *root_default = cJSON_GetObjectItem(root, "default_ct");
-        if (!cJSON_IsObject(root_default))
-        {
-            // Existiert nicht oder ist kein Objekt → neu erstellen
-            cJSON_DeleteItemFromObject(root, "default_ct"); // sichergehen, dass es weg ist
-            root_default = cJSON_CreateObject();
-            cJSON_AddItemToObject(root, "default_ct", root_default);
-        }
-
-        cJSON *min_item = cJSON_GetObjectItem(patch_default, "min");
-        cJSON *max_item = cJSON_GetObjectItem(patch_default, "max");
-        if (cJSON_IsNumber(min_item))
-        {
-            if (!cJSON_HasObjectItem(root_default, "min"))
-            {
-                cJSON_AddNumberToObject(root_default, "min", min_item->valuedouble);
-            }
-            else
-            {
-                cJSON_ReplaceItemInObject(root_default, "min", cJSON_Duplicate(min_item, 1));
-            }
-        }
-
-        if (cJSON_IsNumber(max_item))
-        {
-            if (!cJSON_HasObjectItem(root_default, "max"))
-            {
-                cJSON_AddNumberToObject(root_default, "max", max_item->valuedouble);
-            }
-            else
-            {
-                cJSON_ReplaceItemInObject(root_default, "max", cJSON_Duplicate(max_item, 1));
-            }
-        }
-    }
-
+    // Generisches rekursives Patchen
+    cjson_merge_objects(root, patch);
     cJSON_Delete(patch);
+
 
     char *updated_json = cJSON_Print(root);
     ESP_LOGD(TAG, "Aktualisierte JSON-Konfiguration:\n%s", updated_json);
