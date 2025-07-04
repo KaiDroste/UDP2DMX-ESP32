@@ -16,6 +16,8 @@
 
 #include "my_wifi.h"
 #include "my_led.h"
+#include "my_config.h"
+#include "config_handler.h"
 
 #define TX_PIN 17
 #define RX_PIN 16
@@ -163,7 +165,6 @@ static void set_multi_channels(int ch, int *values, int count, int fade_ms)
         dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
     }
 }
-
 static void handle_udp_command(const char *cmd)
 {
     char *copy = strdup(cmd);
@@ -183,7 +184,7 @@ static void handle_udp_command(const char *cmd)
     int val = atoi(arg1);
     int fade_ms = speed_to_ms(arg2 ? atoi(arg2) : 255);
 
-    if (ch < 1 || ch >= DMX_UNIVERSE_SIZE)
+    if (ch < 1 || ch + 1 >= DMX_UNIVERSE_SIZE) // Für L und W brauchen wir 2 Kanäle
     {
         free(copy);
         return;
@@ -205,11 +206,9 @@ static void handle_udp_command(const char *cmd)
     }
     case 'W':
     {
-        // Erwartet WW und CW im Format WW*1000 + CW, z. B. 200055 → WW=200, CW=55
         int ww = (val / 1000) % 1000;
         int cw = val % 1000;
 
-        // Begrenzen auf gültigen DMX-Wertebereich [0–255]
         ww = ww > 255 ? 255 : (ww < 0 ? 0 : ww);
         cw = cw > 255 ? 255 : (cw < 0 ? 0 : cw);
 
@@ -219,11 +218,80 @@ static void handle_udp_command(const char *cmd)
         ESP_LOGI(TAG, "TW %d: WW=%d CW=%d mit Fading %d ms", ch, ww, cw, fade_ms);
         break;
     }
+    case 'L':
+    {
+        if (val < 200000000 || val > 209999999)
+        {
+            ESP_LOGW(TAG, "Ungültiges L-Kommando: %d", val);
+            break;
+        }
+
+        // 1) Soll-Helligkeit (0–100) und Soll-CT (z.B. 2700…6500) extrahieren
+        int brightness = (val / 10000) % 1000;
+        int color_temp = val % 10000;
+
+        brightness = brightness < 0 ? 0 : (brightness > 100 ? 100 : brightness);
+
+        // 2) WW/CW nach tatsächlicher CT sortieren
+        int ct_ww, ct_cw, ch_ww, ch_cw;
+        get_ct_sorted(ch, &ct_ww, &ct_cw, &ch_ww, &ch_cw);
+
+        // 3) Soll-CT auf erlaubten Bereich clampen
+        if (color_temp < ct_ww)
+            color_temp = ct_ww;
+        if (color_temp > ct_cw)
+            color_temp = ct_cw;
+
+        // 4) Entscheidung: welcher Kanal bekommt wie viel?
+        int val_ww = 0, val_cw = 0;
+        int value = brightness * 255 / 100;
+
+        if (color_temp <= ct_ww + 100)
+        {
+            // fast ganz warm → nur WW an
+            val_ww = value;
+            val_cw = 0;
+        }
+        else if (color_temp >= ct_cw - 100)
+        {
+            // fast ganz kalt → nur CW an
+            val_ww = 0;
+            val_cw = value;
+        }
+        else
+        {
+            // Mischfarbe → normal berechnen
+            int range = ct_cw - ct_ww;
+            long num_cw = (long)brightness * (color_temp - ct_ww) * 255;
+            long num_ww = (long)brightness * (ct_cw - color_temp) * 255;
+            long den = (long)range * 100;
+
+            val_cw = (int)((num_cw + den / 2) / den);
+            val_ww = (int)((num_ww + den / 2) / den);
+
+            if (val_cw * 100 / 255 < 2)
+                val_cw = 0;
+            if (val_ww * 100 / 255 < 2)
+                val_ww = 0;
+        }
+
+        // 5) Array für set_multi_channels aufbauen
+        int start_ch = (ch_ww < ch_cw ? ch_ww : ch_cw);
+        int values[2] = {0, 0};
+        values[ch_ww - start_ch] = val_ww;
+        values[ch_cw - start_ch] = val_cw;
+
+        // 6) abschicken
+        set_multi_channels(start_ch, values, 2, fade_ms);
+
+        ESP_LOGI(TAG, "Lichtfarbe %dK, Helligkeit %d%% → WW=%d (CH%d), CW=%d (CH%d)",
+                 color_temp, brightness, val_ww, ch_ww, val_cw, ch_cw);
+        break;
+    }
 
     case 'P':
         val = (val * 255) / 100;
-        // fall trough
-        __attribute__((fallthrough)); // Ensure we handle 'P' like 'C' (No warnings about fallthrough)
+        __attribute__((fallthrough));
     case 'C':
         set_channel(ch, val, fade_ms);
         ESP_LOGI(TAG, "Kanal %d gesetzt auf %d", ch, val);
@@ -279,27 +347,14 @@ void udp_server_task(void *arg)
 
 void app_main()
 {
+    esp_log_level_set("wifi", ESP_LOG_DEBUG);
+    esp_log_level_set("event", ESP_LOG_DEBUG);
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // // Debug LED konfigurieren
-    // gpio_config_t io_conf = {
-    //     .pin_bit_mask = 1ULL << DEBUG_LED_GPIO,
-    //     .mode = GPIO_MODE_OUTPUT,
-    //     .pull_up_en = 0,
-    //     .pull_down_en = 0,
-    //     .intr_type = GPIO_INTR_DISABLE};
-    // gpio_config(&io_conf);
-    // gpio_set_level(DEBUG_LED_GPIO, 1); // LED an beim Start
     my_led_init(DEBUG_LED_GPIO);
-
-    // WLAN verbinden
     my_wifi_init();
-    // ESP_ERROR_CHECK(example_connect());
-    // wifi_connected = true;
-    // my_led_set_wifi_status(true);
-    // wifi_connected = my_wifi_is_connected();
 
     // DMX Setup
     dmx_config_t config = DMX_CONFIG_DEFAULT;
@@ -312,12 +367,13 @@ void app_main()
     // Tasks starten
     xTaskCreate(udp_server_task, "udp_server", 8192, NULL, 5, NULL);
     xTaskCreate(fade_task, "fade_task", 4096, NULL, 5, NULL);
-    // xTaskCreate(led_status_task, "led_status_task", 2048, NULL, 3, NULL);
 
-    ESP_LOGI(TAG, "System bereit – DMX aktiv & WiFi verbunden");
-    // blink_debug_led(2, 200); // 2x blinken zur Bestätigung
+    ESP_LOGI(TAG, "System bereit: DMX aktiv & WiFi verbunden");
     my_led_blink(2, 200);
 
+    spiffs_init();
+    config_load_from_spiffs("/spiffs/config.json");
+    start_rest_server();
     TickType_t last = xTaskGetTickCount();
     while (1)
     {

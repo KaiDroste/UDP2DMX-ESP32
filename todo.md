@@ -1,7 +1,13 @@
-- [] 0-255 Werte wieder auf 0-100 % anpassen und skalieren
 - Webserver?
   - Wifi
   - IP
-- Lichtfarbe für jeden Kanal vorgeben (als json/textdatei) --> Dadurch kann der Wert von Loxone direkt übergeben werden
-  - Prüfen ob diese Werte per UDP geschrieben werden können?
-- mDNS hostname in Menuconfig ergänzen
+
+- [x] mDNS hostname in Menuconfig ergänzen /oder besser in config.json festlegen
+  Prüfen!
+--> rekursives Merging JSON Handler umbauen (siehe Chatgpt)
+
+
+- Menuconfig (an readme anpassen) (Zur Anpasung der PINs)
+  - DMX config 
+  - LED config
+  - Button Config

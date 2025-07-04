@@ -18,9 +18,14 @@
 #define WIFI_SWITCH_BUTTON_GPIO CONFIG_WIFI_SWITCH_BUTTON_GPIO
 
 static const char *TAG = "wifi";
+static bool is_connecting = false;
+// static const char *hostname = "udp2dmx";
+static char current_hostname[32] = "udp2dmx";
 
 bool my_wifi_is_connected(void);
 static int current_network = 0;
+
+static TaskHandle_t reconnect_task_handle = NULL;
 
 typedef struct
 {
@@ -34,22 +39,59 @@ static wifi_config_entry_t wifi_configs[MAX_NETWORKS] = {
     {CONFIG_WIFI_SSID_3, CONFIG_WIFI_PASS_3},
 };
 
+void my_wifi_set_hostname(const char *new_hostname)
+{
+    if (!new_hostname || strlen(new_hostname) >= sizeof(current_hostname))
+        return;
+
+    strncpy(current_hostname, new_hostname, sizeof(current_hostname));
+    current_hostname[sizeof(current_hostname) - 1] = '\0';
+
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif) {
+        esp_netif_set_hostname(netif, current_hostname);
+        ESP_LOGI(TAG, "Hostname aktualisiert auf: %s", current_hostname);
+    }
+
+    // auch mDNS aktualisieren
+    mdns_hostname_set(current_hostname);
+}
+
+// const char *my_wifi_get_hostname(void)
+// {
+//     return current_hostname;
+// }
+
 void start_mdns_service(void)
 {
     mdns_init();
-    mdns_hostname_set("udp2dmx");             // ergibt esp32.local
+    mdns_hostname_set(current_hostname); // ergibt esp32.local
+    // mdns_hostname_set(hostname); // ergibt esp32.local
+    // ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", hostname);
+    ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", current_hostname);
     mdns_instance_name_set("DMX Controller"); // Name in der mDNS-Anfrage
 }
 
 static void connect_to_wifi(int index)
 {
+    if (is_connecting)
+    {
+        ESP_LOGW(TAG, "Verbindungsversuch läuft bereits – überspringe");
+        return;
+    }
+
+    if (index < 0 || index >= MAX_NETWORKS)
+    {
+        ESP_LOGW(TAG, "Ungültiger Netzwerkindex");
+        return;
+    }
     wifi_config_t wifi_config = {};
     strncpy((char *)wifi_config.sta.ssid, wifi_configs[index].ssid, sizeof(wifi_config.sta.ssid));
     strncpy((char *)wifi_config.sta.password, wifi_configs[index].password, sizeof(wifi_config.sta.password));
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_disconnect());
-    vTaskDelay(pdMS_TO_TICKS(200));
+
+    is_connecting = true;
     ESP_ERROR_CHECK(esp_wifi_connect());
 
     ESP_LOGI(TAG, "Verbinde mit SSID %s ...", wifi_configs[index].ssid);
@@ -60,21 +102,54 @@ static void indicate_wifi_selection(int index)
     my_led_blink(index + 1, 150); // 1x für SSID_1, 2x für SSID_2 usw.
 }
 
+void reconnect_task(void *param)
+{
+    while (1)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Warten auf "Signal"
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        if (!is_connecting)
+        {
+            connect_to_wifi(current_network);
+        }
+        // connect_to_wifi(current_network);
+    }
+}
+
+const char *reason_str(wifi_err_reason_t reason)
+{
+    switch (reason)
+    {
+    case WIFI_REASON_AUTH_EXPIRE:
+        return "Authentication expired";
+    case WIFI_REASON_AUTH_FAIL:
+        return "Authentication failed";
+    case WIFI_REASON_NO_AP_FOUND:
+        return "AP not found";
+    case WIFI_REASON_HANDSHAKE_TIMEOUT:
+        return "Handshake timeout";
+    // ... weitere Gründe nach Bedarf
+    default:
+        return "Unbekannter Grund";
+    }
+}
+
 static void on_wifi_event(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
         wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *)event_data;
-        ESP_LOGW("my_wifi", "WLAN getrennt (Grund %d)", disconn->reason);
-        // ESP_LOGW("my_wifi", "WLAN getrennt");
+        ESP_LOGW("my_wifi", "WLAN getrennt (Grund %d: %s)", disconn->reason, reason_str(disconn->reason));
+
         my_led_set_wifi_status(false); // LED blinkt
-        vTaskDelay(pdMS_TO_TICKS(2000));
-        connect_to_wifi(current_network);
+        is_connecting = false;
+        xTaskNotifyGive(reconnect_task_handle);
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ESP_LOGI("my_wifi", "WLAN verbunden – IP erhalten");
+        is_connecting = false;
         my_led_set_wifi_status(true);
 
         start_mdns_service();
@@ -84,7 +159,11 @@ static void on_wifi_event(void *arg, esp_event_base_t event_base,
 void wifi_switch_next_network(void)
 {
     current_network = (current_network + 1) % MAX_NETWORKS;
-    connect_to_wifi(current_network);
+    ESP_ERROR_CHECK(esp_wifi_disconnect());
+    ESP_LOGI(TAG, "wifi Disconnected");
+    // vTaskDelay(pdMS_TO_TICKS(200));
+    // connect_to_wifi(current_network);
+    // xTaskNotifyGive(reconnect_task_handle);
     indicate_wifi_selection(current_network);
 }
 
@@ -140,8 +219,11 @@ void my_wifi_init(void)
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
+    // Für die Verbindung mit TP-Link Routern Kann später entfernt werden @TODO
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
     connect_to_wifi(current_network);
 
     xTaskCreate(button_task, "wifi_button_task", 2048, NULL, 5, NULL);
+    xTaskCreate(reconnect_task, "reconnect_task", 4096, NULL, 5, &reconnect_task_handle);
 }
