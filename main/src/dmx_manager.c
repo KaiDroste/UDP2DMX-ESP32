@@ -71,8 +71,8 @@ esp_err_t dmx_manager_init(int tx_pin, int rx_pin, int en_pin)
     // Initialize DMX driver with simple configuration like working code
     dmx_config_t config = DMX_CONFIG_DEFAULT;
 
-    dmx_driver_install(dmx_num, &config, NULL, 0);
-    dmx_set_pin(dmx_num, tx_pin, rx_pin, en_pin);
+    dmx_driver_install(dmx_port, &config, NULL, 0);
+    dmx_set_pin(dmx_port, tx_pin, rx_pin, en_pin);
 
     // MAX1348 specific setup
     // Configure Enable pin for MAX1348 transceiver
@@ -93,7 +93,7 @@ esp_err_t dmx_manager_init(int tx_pin, int rx_pin, int en_pin)
     // Initialize data exactly like working code
     memset(dmx_data, 0, sizeof(dmx_data));
     memset(fade_states, 0, sizeof(fade_states));
-    dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+    dmx_write(dmx_port, dmx_data, DMX_UNIVERSE_SIZE);
 
     // Create fade task
     BaseType_t task_result = xTaskCreate(
@@ -131,7 +131,7 @@ void dmx_manager_deinit(void)
     }
 
     // Clean up DMX driver
-    dmx_driver_delete(dmx_num);
+    dmx_driver_delete(dmx_port);
 
     // Clean up mutex
     if (dmx_mutex != NULL)
@@ -177,7 +177,7 @@ dmx_command_result_t dmx_set_channel(int channel, uint8_t value, int fade_ms)
         if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
         {
             dmx_data[array_index] = value;
-            dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+            dmx_write(dmx_port, dmx_data, DMX_UNIVERSE_SIZE);
             // Remove dmx_send() - only send in main loop like original
             xSemaphoreGive(dmx_mutex);
             return DMX_CMD_SUCCESS;
@@ -234,7 +234,7 @@ dmx_command_result_t dmx_set_multi_channels(int start_channel, const uint8_t *va
                 fade_states[array_start + i].active = false;
                 dmx_data[array_start + i] = values[i];
             }
-            dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+            dmx_write(dmx_port, dmx_data, DMX_UNIVERSE_SIZE);
             // Remove dmx_send() - only send in main loop like original
             xSemaphoreGive(dmx_mutex);
             return DMX_CMD_SUCCESS;
@@ -493,7 +493,7 @@ static void fade_task(void *arg)
             // Send DMX data if updated (write only when changed)
             if (updated)
             {
-                dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
+                dmx_write(dmx_port, dmx_data, DMX_UNIVERSE_SIZE);
             }
 
             xSemaphoreGive(dmx_mutex);
