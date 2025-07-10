@@ -11,7 +11,7 @@ extern "C" {
 
 // DMX Manager Configuration
 #define DMX_UNIVERSE_SIZE 512
-#define DMX_FADE_INTERVAL_MS 10
+#define DMX_FADE_INTERVAL_MS 30
 
 // Command result types for better error handling
 typedef enum {

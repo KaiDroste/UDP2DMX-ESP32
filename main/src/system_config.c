@@ -13,54 +13,46 @@ static system_config_t default_config = {
         .dmx_tx_pin = 17,
         .dmx_rx_pin = 16,
         .dmx_en_pin = 21,
-        .debug_led_gpio = 2
-    },
-    .network = {
-        .udp_port = 6454,
-        .max_udp_buffer_size = 1024
-    },
-    .dmx = {
-        .universe_size = 512,
-        .fade_interval_ms = 10
-    },
-    .system = {
-        .enable_debug_logging = false,
-        .watchdog_timeout_ms = 30000
-    }
-};
+        .debug_led_gpio = 2},
+    .network = {.udp_port = 6454, .max_udp_buffer_size = 1024},
+    .dmx = {.universe_size = 512, .fade_interval_ms = 10},
+    .system = {.enable_debug_logging = false, .watchdog_timeout_ms = 30000}};
 
 static system_config_t current_config;
 static bool config_initialized = false;
 
 esp_err_t system_config_init(void)
 {
-    if (config_initialized) {
+    if (config_initialized)
+    {
         ESP_LOGW(TAG, "System config already initialized");
         return ESP_OK;
     }
 
     // Load default configuration
     memcpy(&current_config, &default_config, sizeof(system_config_t));
-    
+
     // Try to load from NVS
     esp_err_t err = system_config_load_from_nvs();
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGW(TAG, "Failed to load config from NVS, using defaults");
     }
 
     config_initialized = true;
     ESP_LOGI(TAG, "System configuration initialized");
-    
+
     return ESP_OK;
 }
 
-const system_config_t* system_config_get(void)
+const system_config_t *system_config_get(void)
 {
-    if (!config_initialized) {
+    if (!config_initialized)
+    {
         ESP_LOGW(TAG, "System config not initialized, returning defaults");
         return &default_config;
     }
-    
+
     return &current_config;
 }
 
@@ -68,7 +60,8 @@ esp_err_t system_config_load_from_nvs(void)
 {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGW(TAG, "Failed to open NVS namespace: %s", esp_err_to_name(err));
         return err;
     }
@@ -77,14 +70,18 @@ esp_err_t system_config_load_from_nvs(void)
     err = nvs_get_blob(nvs_handle, "config", &current_config, &required_size);
     nvs_close(nvs_handle);
 
-    if (err == ESP_OK) {
-        if (!system_config_validate(&current_config)) {
+    if (err == ESP_OK)
+    {
+        if (!system_config_validate(&current_config))
+        {
             ESP_LOGW(TAG, "Loaded config is invalid, using defaults");
             memcpy(&current_config, &default_config, sizeof(system_config_t));
             return ESP_ERR_INVALID_CRC;
         }
         ESP_LOGI(TAG, "Configuration loaded from NVS");
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "Failed to load config from NVS: %s", esp_err_to_name(err));
     }
 
@@ -93,22 +90,26 @@ esp_err_t system_config_load_from_nvs(void)
 
 esp_err_t system_config_save_to_nvs(void)
 {
-    if (!system_config_validate(&current_config)) {
+    if (!system_config_validate(&current_config))
+    {
         ESP_LOGE(TAG, "Cannot save invalid configuration");
         return ESP_ERR_INVALID_ARG;
     }
 
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to open NVS namespace: %s", esp_err_to_name(err));
         return err;
     }
 
     err = nvs_set_blob(nvs_handle, "config", &current_config, sizeof(system_config_t));
-    if (err == ESP_OK) {
+    if (err == ESP_OK)
+    {
         err = nvs_commit(nvs_handle);
-        if (err == ESP_OK) {
+        if (err == ESP_OK)
+        {
             ESP_LOGI(TAG, "Configuration saved to NVS");
         }
     }
@@ -124,9 +125,10 @@ esp_err_t system_config_load_defaults(void)
     return ESP_OK;
 }
 
-bool system_config_validate(const system_config_t* config)
+bool system_config_validate(const system_config_t *config)
 {
-    if (!config) {
+    if (!config)
+    {
         return false;
     }
 
@@ -134,35 +136,41 @@ bool system_config_validate(const system_config_t* config)
     if (config->hardware.dmx_tx_pin < 0 || config->hardware.dmx_tx_pin > 39 ||
         config->hardware.dmx_rx_pin < 0 || config->hardware.dmx_rx_pin > 39 ||
         config->hardware.dmx_en_pin < 0 || config->hardware.dmx_en_pin > 39 ||
-        config->hardware.debug_led_gpio < 0 || config->hardware.debug_led_gpio > 39) {
+        config->hardware.debug_led_gpio < 0 || config->hardware.debug_led_gpio > 39)
+    {
         ESP_LOGW(TAG, "Invalid GPIO pin configuration");
         return false;
     }
 
     // Validate network settings
-    if (config->network.udp_port == 0) {
+    if (config->network.udp_port == 0)
+    {
         ESP_LOGW(TAG, "Invalid UDP port: %d", config->network.udp_port);
         return false;
     }
 
-    if (config->network.max_udp_buffer_size < 64 || config->network.max_udp_buffer_size > 8192) {
+    if (config->network.max_udp_buffer_size < 64 || config->network.max_udp_buffer_size > 8192)
+    {
         ESP_LOGW(TAG, "Invalid UDP buffer size: %d", config->network.max_udp_buffer_size);
         return false;
     }
 
     // Validate DMX settings
-    if (config->dmx.universe_size < 1 || config->dmx.universe_size > 512) {
+    if (config->dmx.universe_size < 1 || config->dmx.universe_size > 512)
+    {
         ESP_LOGW(TAG, "Invalid DMX universe size: %d", config->dmx.universe_size);
         return false;
     }
 
-    if (config->dmx.fade_interval_ms < 1 || config->dmx.fade_interval_ms > 1000) {
+    if (config->dmx.fade_interval_ms < 1 || config->dmx.fade_interval_ms > 1000)
+    {
         ESP_LOGW(TAG, "Invalid fade interval: %d", config->dmx.fade_interval_ms);
         return false;
     }
 
     // Validate system settings
-    if (config->system.watchdog_timeout_ms < 1000 || config->system.watchdog_timeout_ms > 300000) {
+    if (config->system.watchdog_timeout_ms < 1000 || config->system.watchdog_timeout_ms > 300000)
+    {
         ESP_LOGW(TAG, "Invalid watchdog timeout: %d", config->system.watchdog_timeout_ms);
         return false;
     }
@@ -170,9 +178,10 @@ bool system_config_validate(const system_config_t* config)
     return true;
 }
 
-void system_config_print(const system_config_t* config)
+void system_config_print(const system_config_t *config)
 {
-    if (!config) {
+    if (!config)
+    {
         ESP_LOGE(TAG, "NULL configuration pointer");
         return;
     }
@@ -183,15 +192,15 @@ void system_config_print(const system_config_t* config)
     ESP_LOGI(TAG, "  DMX RX Pin: %d", config->hardware.dmx_rx_pin);
     ESP_LOGI(TAG, "  DMX EN Pin: %d", config->hardware.dmx_en_pin);
     ESP_LOGI(TAG, "  Debug LED GPIO: %d", config->hardware.debug_led_gpio);
-    
+
     ESP_LOGI(TAG, "Network:");
     ESP_LOGI(TAG, "  UDP Port: %d", config->network.udp_port);
     ESP_LOGI(TAG, "  Max UDP Buffer: %d", config->network.max_udp_buffer_size);
-    
+
     ESP_LOGI(TAG, "DMX:");
     ESP_LOGI(TAG, "  Universe Size: %d", config->dmx.universe_size);
     ESP_LOGI(TAG, "  Fade Interval: %d ms", config->dmx.fade_interval_ms);
-    
+
     ESP_LOGI(TAG, "System:");
     ESP_LOGI(TAG, "  Debug Logging: %s", config->system.enable_debug_logging ? "Yes" : "No");
     ESP_LOGI(TAG, "  Watchdog Timeout: %d ms", config->system.watchdog_timeout_ms);

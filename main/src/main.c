@@ -47,17 +47,17 @@ void app_main()
         return;
     }
 
-    // Initialize DMX system
-    err = init_dmx_system();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize DMX system: %s", esp_err_to_name(err));
-        return;
-    }
-
-    // Initialize network services
+    // Initialize network services first (like in working version)
     err = init_network_services();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize network services: %s", esp_err_to_name(err));
+        return;
+    }
+
+    // Initialize DMX system AFTER WiFi (like in working version)
+    err = init_dmx_system();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize DMX system: %s", esp_err_to_name(err));
         return;
     }
 
@@ -134,6 +134,10 @@ static esp_err_t init_dmx_system(void)
 {
     ESP_LOGI(TAG, "Initializing DMX system...");
     
+    // Wait a bit for system stability (like in working version)
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    ESP_LOGI(TAG, "System settled, proceeding with DMX initialization");
+    
     const system_config_t *config = system_config_get();
 
     // Initialize DMX manager
@@ -194,13 +198,10 @@ static esp_err_t start_main_loop(void)
     TickType_t last_wake_time = xTaskGetTickCount();
     
     while (1) {
-        // Send DMX frame
-        esp_err_t err = dmx_send(DMX_NUM_1);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "DMX send failed: %s", esp_err_to_name(err));
-        }
-
-        // Wait for next frame (30ms = ~33 FPS)
+        // Continuous DMX sending - exact timing from working code
+        dmx_send(DMX_NUM_1);
+        
+        // Use exact 30ms timing from working version
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(30));
     }
 
