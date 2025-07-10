@@ -13,17 +13,8 @@ dependencies:
     source:
       type: idf
     version: 5.0.0
-  someweisguy/esp_dmx:
-    component_hash: e33890d3f5095374ed20499068ab0f8ba1c21c265dd303a85aa23f2be60f6cca
-    dependencies: []
-    source:
-      git: https://github.com/someweisguy/esp_dmx
-      path: .
-      type: git
-    version: 9b6a5043add89038388d93ebe77109eb3368bb51
 direct_dependencies:
 - espressif/mdns
-- someweisguy/esp_dmx
-manifest_hash: e098574e58d5f1606c8285801230dbb7a1e1e5c36a814d339e2f502b0903d6d7
+manifest_hash: 677a4586e48452372ef88bd1133a430c26ff6eaeabb669baff0c39c165dbf0a6
 target: esp32
 version: 2.0.0

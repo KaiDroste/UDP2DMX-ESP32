@@ -1,4 +1,3 @@
-
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -19,7 +18,6 @@
 
 static const char *TAG = "wifi";
 static bool is_connecting = false;
-// static const char *hostname = "udp2dmx";
 static char current_hostname[32] = "udp2dmx";
 
 bool my_wifi_is_connected(void);
@@ -91,8 +89,6 @@ void start_mdns_service(void)
 {
     mdns_init();
     mdns_hostname_set(current_hostname); // ergibt esp32.local
-    // mdns_hostname_set(hostname); // ergibt esp32.local
-    // ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", hostname);
     ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", current_hostname);
     mdns_instance_name_set("DMX Controller"); // Name in der mDNS-Anfrage
 }
@@ -245,7 +241,7 @@ void my_wifi_init(void)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
     // Für die Verbindung mit TP-Link Routern Kann später entfernt werden @TODO
-    esp_wifi_set_ps(WIFI_PS_NONE);
+    // esp_wifi_set_ps(WIFI_PS_NONE);
 
     connect_to_wifi(current_network);
 
