@@ -3,12 +3,7 @@
 A lightweight and flexible UDP-to-DMX gateway based on the ESP32 platform, designed to bridge the **Loxone Home Automation System** with **DMX512-based lighting systems** via UDP over Wi-Fi.
 
 This project enables direct communication between Loxone and DMX devices using a well-defined, lightweight UDP protocol. It is ideal for smart home installations where wireless DMX control is required.
-
----
-
-## ⚙️ Key Features
-
-- ✅ ESP-IDF 5.0 support  
+ 
 - ✅ Based on the open-source [ESP-DMX library](https://github.com/someweisguy/esp_dmx)  
 - ✅ UDP-based protocol (compatible with Loxone UDP protocol)  
 - ✅ Easily testable via Jupyter notebook  
@@ -20,6 +15,7 @@ This project enables direct communication between Loxone and DMX devices using a
 ### 1. Install ESP-IDF
 
 Make sure ESP-IDF v5.0 is installed and properly set up. For installation instructions, refer to the [official ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html).
+Version newer than v5.0 is currently not supported
 
 ---
 
