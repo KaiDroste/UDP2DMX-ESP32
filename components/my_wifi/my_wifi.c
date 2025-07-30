@@ -41,43 +41,43 @@ void my_wifi_set_hostname(const char *new_hostname)
 {
     if (!new_hostname || strlen(new_hostname) >= sizeof(current_hostname))
     {
-        ESP_LOGW(TAG, "Hostname ungültig oder zu lang: %s", new_hostname);
+        ESP_LOGW(TAG, "Hostname invalid or too long: %s", new_hostname);
         return;
     }
 
     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (!netif)
     {
-        ESP_LOGE(TAG, "esp_netif nicht gefunden");
+        ESP_LOGE(TAG, "esp_netif not found");
         return;
     }
 
     const char *old_hostname = NULL;
     if (esp_netif_get_hostname(netif, &old_hostname) != ESP_OK)
     {
-        ESP_LOGW(TAG, "Alter Hostname konnte nicht gelesen werden");
+        ESP_LOGW(TAG, "Could not read old hostname");
         old_hostname = NULL;
     }
 
-    // Nur aktualisieren, wenn sich der Hostname ändert
+    // Only update if hostname changes
     if (old_hostname && strcmp(old_hostname, new_hostname) == 0)
     {
-        ESP_LOGI(TAG, "Hostname ist bereits: %s", old_hostname);
+        ESP_LOGI(TAG, "Hostname is already: %s", old_hostname);
         return;
     }
 
-    // Hostname speichern und setzen
+    // Store and set hostname
     strncpy(current_hostname, new_hostname, sizeof(current_hostname));
     current_hostname[sizeof(current_hostname) - 1] = '\0';
 
     esp_netif_set_hostname(netif, current_hostname);
-    ESP_LOGI(TAG, "Hostname geändert: %s", current_hostname);
+    ESP_LOGI(TAG, "Hostname changed: %s", current_hostname);
 
-    // mDNS aktualisieren
-    mdns_free(); // Alte Instanz freigeben
-    mdns_init(); // Neu initialisieren
+    // Update mDNS
+    mdns_free(); // Free old instance
+    mdns_init(); // Reinitialize
     mdns_hostname_set(current_hostname);
-    ESP_LOGI(TAG, "mDNS-Hostname aktualisiert auf: %s", current_hostname);
+    ESP_LOGI(TAG, "mDNS hostname updated to: %s", current_hostname);
 }
 
 // const char *my_wifi_get_hostname(void)
@@ -88,22 +88,22 @@ void my_wifi_set_hostname(const char *new_hostname)
 void start_mdns_service(void)
 {
     mdns_init();
-    mdns_hostname_set(current_hostname); // ergibt esp32.local
-    ESP_LOGI(TAG, "mDNS-Hostname gesetzt: %s", current_hostname);
-    mdns_instance_name_set("DMX Controller"); // Name in der mDNS-Anfrage
+    mdns_hostname_set(current_hostname); // results in esp32.local
+    ESP_LOGI(TAG, "mDNS hostname set: %s", current_hostname);
+    mdns_instance_name_set("DMX Controller"); // Name in mDNS query
 }
 
 static void connect_to_wifi(int index)
 {
     if (is_connecting)
     {
-        ESP_LOGW(TAG, "Verbindungsversuch läuft bereits – überspringe");
+        ESP_LOGW(TAG, "Connection attempt already in progress – skipping");
         return;
     }
 
     if (index < 0 || index >= MAX_NETWORKS)
     {
-        ESP_LOGW(TAG, "Ungültiger Netzwerkindex");
+        ESP_LOGW(TAG, "Invalid network index");
         return;
     }
     wifi_config_t wifi_config = {};
@@ -115,19 +115,19 @@ static void connect_to_wifi(int index)
     is_connecting = true;
     ESP_ERROR_CHECK(esp_wifi_connect());
 
-    ESP_LOGI(TAG, "Verbinde mit SSID %s ...", wifi_configs[index].ssid);
+    ESP_LOGI(TAG, "Connecting to SSID %s ...", wifi_configs[index].ssid);
 }
 
 static void indicate_wifi_selection(int index)
 {
-    my_led_blink(index + 1, 150); // 1x für SSID_1, 2x für SSID_2 usw.
+    my_led_blink(index + 1, 150); // 1x for SSID_1, 2x for SSID_2 etc.
 }
 
 void reconnect_task(void *param)
 {
     while (1)
     {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Warten auf "Signal"
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait for "signal"
         vTaskDelay(pdMS_TO_TICKS(2000));
         if (!is_connecting)
         {
@@ -149,9 +149,8 @@ const char *reason_str(wifi_err_reason_t reason)
         return "AP not found";
     case WIFI_REASON_HANDSHAKE_TIMEOUT:
         return "Handshake timeout";
-    // ... weitere Gründe nach Bedarf
     default:
-        return "Unbekannter Grund";
+        return "Unknown reason";
     }
 }
 
@@ -161,15 +160,15 @@ static void on_wifi_event(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
         wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *)event_data;
-        ESP_LOGW("my_wifi", "WLAN getrennt (Grund %d: %s)", disconn->reason, reason_str(disconn->reason));
+        ESP_LOGW("my_wifi", "WiFi disconnected (reason %d: %s)", disconn->reason, reason_str(disconn->reason));
 
-        my_led_set_wifi_status(false); // LED blinkt
+        my_led_set_wifi_status(false); // LED blinks
         is_connecting = false;
         xTaskNotifyGive(reconnect_task_handle);
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
-        ESP_LOGI("my_wifi", "WLAN verbunden – IP erhalten");
+        ESP_LOGI("my_wifi", "WiFi connected – IP received");
         is_connecting = false;
         my_led_set_wifi_status(true);
 
@@ -205,7 +204,7 @@ static void button_task(void *arg)
         if (!state && last_state)
         {
             wifi_switch_next_network();
-            vTaskDelay(pdMS_TO_TICKS(500)); // Entprellung
+            vTaskDelay(pdMS_TO_TICKS(500)); // Debouncing
         }
         last_state = state;
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -219,7 +218,7 @@ void my_wifi_init(void)
     esp_err_t err = esp_event_loop_create_default();
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
     {
-        ESP_LOGE(TAG, "Fehler beim Erstellen des Event Loops: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Error creating event loop: %s", esp_err_to_name(err));
         return;
     }
 
@@ -240,8 +239,6 @@ void my_wifi_init(void)
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
-    // Für die Verbindung mit TP-Link Routern Kann später entfernt werden @TODO
-    // esp_wifi_set_ps(WIFI_PS_NONE);
 
     connect_to_wifi(current_network);
 

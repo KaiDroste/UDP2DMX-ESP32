@@ -31,7 +31,8 @@
 #define MAX_UDP_BUFFER_SIZE 1024
 
 // Command result types for better error handling
-typedef enum {
+typedef enum
+{
     CMD_SUCCESS,
     CMD_ERROR_INVALID_CHANNEL,
     CMD_ERROR_INVALID_VALUE,
@@ -85,37 +86,46 @@ static int speed_to_ms(int speed)
 
 static void stop_fade(int ch)
 {
-    if (!is_array_index_valid(ch)) {
+    if (!is_array_index_valid(ch))
+    {
         ESP_LOGW(TAG, "Invalid channel for stop_fade: %d", ch);
         return;
     }
-    
-    if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+
+    if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+    {
         fade_states[ch].active = false;
         xSemaphoreGive(dmx_mutex);
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "Failed to acquire mutex in stop_fade");
     }
 }
 
 static void start_fade(int ch, int value, int duration_ms)
 {
-    if (!is_array_index_valid(ch)) {
+    if (!is_array_index_valid(ch))
+    {
         ESP_LOGW(TAG, "Invalid channel for start_fade: %d", ch);
         return;
     }
-    
+
     // Clamp value to valid range
-    value = (value < 0) ? 0 : (value > 255) ? 255 : value;
-    
-    if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    value = (value < 0) ? 0 : (value > 255) ? 255
+                                            : value;
+
+    if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+    {
         fade_states[ch].start_value = dmx_data[ch];
         fade_states[ch].target_value = value;
         fade_states[ch].duration_ms = duration_ms;
         fade_states[ch].start_time = xTaskGetTickCount();
         fade_states[ch].active = true;
         xSemaphoreGive(dmx_mutex);
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "Failed to acquire mutex in start_fade");
     }
 }
@@ -127,7 +137,8 @@ static void fade_task(void *arg)
         TickType_t now = xTaskGetTickCount();
         bool updated = false;
 
-        if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+        {
             for (int ch = 0; ch < DMX_UNIVERSE_SIZE; ++ch)
             {
                 if (!fade_states[ch].active)
@@ -139,7 +150,7 @@ static void fade_task(void *arg)
                 if (duration <= 0)
                 {
                     dmx_data[ch] = fade_states[ch].target_value;
-                    fade_states[ch].active = false;  // Use direct access since we have mutex
+                    fade_states[ch].active = false; // Use direct access since we have mutex
                     updated = true;
                     continue;
                 }
@@ -152,7 +163,7 @@ static void fade_task(void *arg)
                 if (elapsed >= duration)
                 {
                     new_value = target;
-                    fade_states[ch].active = false;  // Use direct access since we have mutex
+                    fade_states[ch].active = false; // Use direct access since we have mutex
                 }
                 else
                 {
@@ -167,17 +178,20 @@ static void fade_task(void *arg)
                     updated = true;
                 }
             }
-            
+
             if (updated)
             {
                 esp_err_t err = dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-                if (err != ESP_OK) {
+                if (err != ESP_OK)
+                {
                     ESP_LOGW(TAG, "DMX write failed: %s", esp_err_to_name(err));
                 }
             }
-            
+
             xSemaphoreGive(dmx_mutex);
-        } else {
+        }
+        else
+        {
             ESP_LOGW(TAG, "Failed to acquire mutex in fade_task");
         }
 
@@ -187,14 +201,16 @@ static void fade_task(void *arg)
 
 static command_result_t set_channel(int ch, int value, int fade_ms)
 {
-    if (!is_channel_valid(ch, 1)) {
+    if (!is_channel_valid(ch, 1))
+    {
         ESP_LOGW(TAG, "Invalid channel: %d", ch);
         return CMD_ERROR_INVALID_CHANNEL;
     }
-    
+
     // Clamp value to valid range
-    value = (value < 0) ? 0 : (value > 255) ? 255 : value;
-    
+    value = (value < 0) ? 0 : (value > 255) ? 255
+                                            : value;
+
     if (fade_ms > 0 && dmx_data[ch] != value)
     {
         start_fade(ch, value, fade_ms);
@@ -202,14 +218,18 @@ static command_result_t set_channel(int ch, int value, int fade_ms)
     else
     {
         stop_fade(ch);
-        if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+        {
             dmx_data[ch] = value;
             esp_err_t err = dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-            if (err != ESP_OK) {
+            if (err != ESP_OK)
+            {
                 ESP_LOGW(TAG, "DMX write failed: %s", esp_err_to_name(err));
             }
             xSemaphoreGive(dmx_mutex);
-        } else {
+        }
+        else
+        {
             ESP_LOGW(TAG, "Failed to acquire mutex in set_channel");
             return CMD_ERROR_MEMORY;
         }
@@ -219,12 +239,14 @@ static command_result_t set_channel(int ch, int value, int fade_ms)
 
 static command_result_t set_multi_channels(int ch, int *values, int count, int fade_ms)
 {
-    if (!is_channel_valid(ch, count)) {
+    if (!is_channel_valid(ch, count))
+    {
         ESP_LOGW(TAG, "Invalid channel range: %d-%d", ch, ch + count - 1);
         return CMD_ERROR_INVALID_CHANNEL;
     }
-    
-    if (!values) {
+
+    if (!values)
+    {
         ESP_LOGW(TAG, "NULL values pointer in set_multi_channels");
         return CMD_ERROR_INVALID_VALUE;
     }
@@ -234,26 +256,32 @@ static command_result_t set_multi_channels(int ch, int *values, int count, int f
         for (int i = 0; i < count; ++i)
         {
             // Clamp values to valid range
-            int clamped_value = (values[i] < 0) ? 0 : (values[i] > 255) ? 255 : values[i];
+            int clamped_value = (values[i] < 0) ? 0 : (values[i] > 255) ? 255
+                                                                        : values[i];
             start_fade(ch + i, clamped_value, fade_ms);
         }
     }
     else
     {
-        if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+        {
             for (int i = 0; i < count; ++i)
             {
-                fade_states[ch + i].active = false;  // Direct access since we have mutex
+                fade_states[ch + i].active = false; // Direct access since we have mutex
                 // Clamp values to valid range
-                int clamped_value = (values[i] < 0) ? 0 : (values[i] > 255) ? 255 : values[i];
+                int clamped_value = (values[i] < 0) ? 0 : (values[i] > 255) ? 255
+                                                                            : values[i];
                 dmx_data[ch + i] = clamped_value;
             }
             esp_err_t err = dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-            if (err != ESP_OK) {
+            if (err != ESP_OK)
+            {
                 ESP_LOGW(TAG, "DMX write failed: %s", esp_err_to_name(err));
             }
             xSemaphoreGive(dmx_mutex);
-        } else {
+        }
+        else
+        {
             ESP_LOGW(TAG, "Failed to acquire mutex in set_multi_channels");
             return CMD_ERROR_MEMORY;
         }
@@ -261,7 +289,8 @@ static command_result_t set_multi_channels(int ch, int *values, int count, int f
     return CMD_SUCCESS;
 }
 // Command parsing with validation
-typedef struct {
+typedef struct
+{
     char mode;
     int channel;
     int value;
@@ -269,31 +298,35 @@ typedef struct {
     bool valid;
 } parsed_command_t;
 
-static parsed_command_t parse_udp_command(const char* cmd)
+static parsed_command_t parse_udp_command(const char *cmd)
 {
     parsed_command_t result = {0};
-    
-    if (!cmd || strlen(cmd) < 4) {
+
+    if (!cmd || strlen(cmd) < 4)
+    {
         ESP_LOGW(TAG, "Command too short or NULL");
         return result;
     }
-    
-    if (strncmp(cmd, "DMX", 3) != 0) {
+
+    if (strncmp(cmd, "DMX", 3) != 0)
+    {
         ESP_LOGW(TAG, "Command doesn't start with DMX");
         return result;
     }
-    
+
     char *copy = strdup(cmd);
-    if (!copy) {
+    if (!copy)
+    {
         ESP_LOGE(TAG, "Memory allocation failed");
         return result;
     }
-    
+
     char *type = strtok(copy + 3, "#");
     char *arg1 = strtok(NULL, "#");
     char *arg2 = strtok(NULL, "#");
 
-    if (!type || !arg1) {
+    if (!type || !arg1)
+    {
         ESP_LOGW(TAG, "Missing required arguments in command: %s", cmd);
         free(copy);
         return result;
@@ -304,181 +337,192 @@ static parsed_command_t parse_udp_command(const char* cmd)
     result.value = atoi(arg1);
     result.speed = arg2 ? atoi(arg2) : 255;
     result.valid = true;
-    
+
     free(copy);
     return result;
 }
 
 static command_result_t handle_udp_command(const char *cmd)
 {
-static command_result_t handle_udp_command(const char *cmd)
-{
-    parsed_command_t parsed = parse_udp_command(cmd);
-    
-    if (!parsed.valid) {
-        return CMD_ERROR_INVALID_VALUE;
-    }
-    
-    int ch = parsed.channel;
-    int val = parsed.value;
-    int fade_ms = speed_to_ms(parsed.speed);
-    char mode = parsed.mode;
-    
-    // Basic channel validation for commands that need multiple channels
-    if ((mode == 'L' || mode == 'W') && !is_channel_valid(ch, 2)) {
-        ESP_LOGW(TAG, "Invalid channel for %c command: %d", mode, ch);
-        return CMD_ERROR_INVALID_CHANNEL;
-    }
-    if (mode == 'R' && !is_channel_valid(ch, 3)) {
-        ESP_LOGW(TAG, "Invalid channel for RGB command: %d", ch);
-        return CMD_ERROR_INVALID_CHANNEL;
-    }
-    if ((mode == 'C' || mode == 'P') && !is_channel_valid(ch, 1)) {
-        ESP_LOGW(TAG, "Invalid channel for %c command: %d", mode, ch);
-        return CMD_ERROR_INVALID_CHANNEL;
-    }
-
-    command_result_t result = CMD_SUCCESS;
-
-    switch (mode)
+    static command_result_t handle_udp_command(const char *cmd)
     {
-    case 'R':
-    {
-        // Validate RGB values are in reasonable range
-        if (val < 0 || val > 999999999) {
-            ESP_LOGW(TAG, "RGB value out of range: %d", val);
-            return CMD_ERROR_INVALID_VALUE;
-        }
-        
-        int r = (val % 1000);
-        int g = ((val / 1000) % 1000);
-        int b = ((val / 1000000) % 1000);
+        parsed_command_t parsed = parse_udp_command(cmd);
 
-        // Clamp RGB values to 0-255 range
-        r = (r > 255) ? 255 : r;
-        g = (g > 255) ? 255 : g;
-        b = (b > 255) ? 255 : b;
-
-        int rgb[3] = {r, g, b};
-        result = set_multi_channels(ch, rgb, 3, fade_ms);
-
-        if (result == CMD_SUCCESS) {
-            ESP_LOGI(TAG, "RGB %d: R=%d G=%d B=%d mit Fading %d ms", ch, r, g, b, fade_ms);
-        }
-        break;
-    }
-    case 'W':
-    {
-        int ww = (val / 1000) % 1000;
-        int cw = val % 1000;
-
-        ww = ww > 255 ? 255 : (ww < 0 ? 0 : ww);
-        cw = cw > 255 ? 255 : (cw < 0 ? 0 : cw);
-
-        int tw[2] = {ww, cw};
-        result = set_multi_channels(ch, tw, 2, fade_ms);
-
-        if (result == CMD_SUCCESS) {
-            ESP_LOGI(TAG, "TW %d: WW=%d CW=%d mit Fading %d ms", ch, ww, cw, fade_ms);
-        }
-        break;
-    }
-    case 'L':
-    {
-        if (val < 200000000 || val > 209999999)
+        if (!parsed.valid)
         {
-            ESP_LOGW(TAG, "Ungültiges L-Kommando: %d", val);
             return CMD_ERROR_INVALID_VALUE;
         }
 
-        // 1) Soll-Helligkeit (0–100) und Soll-CT (z.B. 2700…6500) extrahieren
-        int brightness = (val / 10000) % 1000;
-        int color_temp = val % 10000;
+        int ch = parsed.channel;
+        int val = parsed.value;
+        int fade_ms = speed_to_ms(parsed.speed);
+        char mode = parsed.mode;
 
-        brightness = brightness < 0 ? 0 : (brightness > 100 ? 100 : brightness);
-
-        // 2) WW/CW nach tatsächlicher CT sortieren
-        int ct_ww, ct_cw, ch_ww, ch_cw;
-        get_ct_sorted(ch, &ct_ww, &ct_cw, &ch_ww, &ch_cw);
-
-        // 3) Soll-CT auf erlaubten Bereich clampen
-        if (color_temp < ct_ww)
-            color_temp = ct_ww;
-        if (color_temp > ct_cw)
-            color_temp = ct_cw;
-
-        // 4) Entscheidung: welcher Kanal bekommt wie viel?
-        int val_ww = 0, val_cw = 0;
-        int value = brightness * 255 / 100;
-
-        if (color_temp <= ct_ww + 100)
+        // Basic channel validation for commands that need multiple channels
+        if ((mode == 'L' || mode == 'W') && !is_channel_valid(ch, 2))
         {
-            // fast ganz warm → nur WW an
-            val_ww = value;
-            val_cw = 0;
+            ESP_LOGW(TAG, "Invalid channel for %c command: %d", mode, ch);
+            return CMD_ERROR_INVALID_CHANNEL;
         }
-        else if (color_temp >= ct_cw - 100)
+        if (mode == 'R' && !is_channel_valid(ch, 3))
         {
-            // fast ganz kalt → nur CW an
-            val_ww = 0;
-            val_cw = value;
+            ESP_LOGW(TAG, "Invalid channel for RGB command: %d", ch);
+            return CMD_ERROR_INVALID_CHANNEL;
         }
-        else
+        if ((mode == 'C' || mode == 'P') && !is_channel_valid(ch, 1))
         {
-            // Mischfarbe → normal berechnen
-            int range = ct_cw - ct_ww;
-            if (range <= 0) {
-                ESP_LOGW(TAG, "Invalid CT range for channel %d", ch);
-                return CMD_ERROR_CONFIG_MISSING;
+            ESP_LOGW(TAG, "Invalid channel for %c command: %d", mode, ch);
+            return CMD_ERROR_INVALID_CHANNEL;
+        }
+
+        command_result_t result = CMD_SUCCESS;
+
+        switch (mode)
+        {
+        case 'R':
+        {
+            // Validate RGB values are in reasonable range
+            if (val < 0 || val > 999999999)
+            {
+                ESP_LOGW(TAG, "RGB value out of range: %d", val);
+                return CMD_ERROR_INVALID_VALUE;
             }
-            
-            long num_cw = (long)brightness * (color_temp - ct_ww) * 255;
-            long num_ww = (long)brightness * (ct_cw - color_temp) * 255;
-            long den = (long)range * 100;
 
-            val_cw = (int)((num_cw + den / 2) / den);
-            val_ww = (int)((num_ww + den / 2) / den);
+            int r = (val % 1000);
+            int g = ((val / 1000) % 1000);
+            int b = ((val / 1000000) % 1000);
 
-            if (val_cw * 100 / 255 < 2)
+            // Clamp RGB values to 0-255 range
+            r = (r > 255) ? 255 : r;
+            g = (g > 255) ? 255 : g;
+            b = (b > 255) ? 255 : b;
+
+            int rgb[3] = {r, g, b};
+            result = set_multi_channels(ch, rgb, 3, fade_ms);
+
+            if (result == CMD_SUCCESS)
+            {
+                ESP_LOGI(TAG, "RGB %d: R=%d G=%d B=%d mit Fading %d ms", ch, r, g, b, fade_ms);
+            }
+            break;
+        }
+        case 'W':
+        {
+            int ww = (val / 1000) % 1000;
+            int cw = val % 1000;
+
+            ww = ww > 255 ? 255 : (ww < 0 ? 0 : ww);
+            cw = cw > 255 ? 255 : (cw < 0 ? 0 : cw);
+
+            int tw[2] = {ww, cw};
+            result = set_multi_channels(ch, tw, 2, fade_ms);
+
+            if (result == CMD_SUCCESS)
+            {
+                ESP_LOGI(TAG, "TW %d: WW=%d CW=%d with fading %d ms", ch, ww, cw, fade_ms);
+            }
+            break;
+        }
+        case 'L':
+        {
+            if (val < 200000000 || val > 209999999)
+            {
+                ESP_LOGW(TAG, "Invalid Lumitec-Command: %d", val);
+                return CMD_ERROR_INVALID_VALUE;
+            }
+
+            // 1) Extract target brightness (0–100) and target CT (e.g. 2700…6500)
+            int brightness = (val / 10000) % 1000;
+            int color_temp = val % 10000;
+
+            brightness = brightness < 0 ? 0 : (brightness > 100 ? 100 : brightness);
+
+            // 2) Sort WW/CW by actual CT
+            int ct_ww, ct_cw, ch_ww, ch_cw;
+            get_ct_sorted(ch, &ct_ww, &ct_cw, &ch_ww, &ch_cw);
+
+            // 3) Soll-CT auf erlaubten Bereich clampen
+            if (color_temp < ct_ww)
+                color_temp = ct_ww;
+            if (color_temp > ct_cw)
+                color_temp = ct_cw;
+
+            // 4) Decision: which channel gets how much?
+            int val_ww = 0, val_cw = 0;
+            int value = brightness * 255 / 100;
+
+            if (color_temp <= ct_ww + 100)
+            {
+                // fast ganz warm → nur WW an
+                val_ww = value;
                 val_cw = 0;
-            if (val_ww * 100 / 255 < 2)
+            }
+            else if (color_temp >= ct_cw - 100)
+            {
+                // fast ganz kalt → nur CW an
                 val_ww = 0;
+                val_cw = value;
+            }
+            else
+            {
+                // Mischfarbe → normal berechnen
+                int range = ct_cw - ct_ww;
+                if (range <= 0)
+                {
+                    ESP_LOGW(TAG, "Invalid CT range for channel %d", ch);
+                    return CMD_ERROR_CONFIG_MISSING;
+                }
+
+                long num_cw = (long)brightness * (color_temp - ct_ww) * 255;
+                long num_ww = (long)brightness * (ct_cw - color_temp) * 255;
+                long den = (long)range * 100;
+
+                val_cw = (int)((num_cw + den / 2) / den);
+                val_ww = (int)((num_ww + den / 2) / den);
+
+                if (val_cw * 100 / 255 < 2)
+                    val_cw = 0;
+                if (val_ww * 100 / 255 < 2)
+                    val_ww = 0;
+            }
+
+            // 5) Array für set_multi_channels aufbauen
+            int start_ch = (ch_ww < ch_cw ? ch_ww : ch_cw);
+            int values[2] = {0, 0};
+            values[ch_ww - start_ch] = val_ww;
+            values[ch_cw - start_ch] = val_cw;
+
+            // 6) abschicken
+            result = set_multi_channels(start_ch, values, 2, fade_ms);
+
+            if (result == CMD_SUCCESS)
+            {
+                ESP_LOGI(TAG, "Lichtfarbe %dK, Helligkeit %d%% → WW=%d (CH%d), CW=%d (CH%d)",
+                         color_temp, brightness, val_ww, ch_ww, val_cw, ch_cw);
+            }
+            break;
         }
 
-        // 5) Array für set_multi_channels aufbauen
-        int start_ch = (ch_ww < ch_cw ? ch_ww : ch_cw);
-        int values[2] = {0, 0};
-        values[ch_ww - start_ch] = val_ww;
-        values[ch_cw - start_ch] = val_cw;
-
-        // 6) abschicken
-        result = set_multi_channels(start_ch, values, 2, fade_ms);
-
-        if (result == CMD_SUCCESS) {
-            ESP_LOGI(TAG, "Lichtfarbe %dK, Helligkeit %d%% → WW=%d (CH%d), CW=%d (CH%d)",
-                     color_temp, brightness, val_ww, ch_ww, val_cw, ch_cw);
+        case 'P':
+            val = (val * 255) / 100;
+            // Clamp percentage to valid range
+            val = (val < 0) ? 0 : (val > 255) ? 255
+                                              : val;
+            __attribute__((fallthrough));
+        case 'C':
+            result = set_channel(ch, val, fade_ms);
+            if (result == CMD_SUCCESS)
+            {
+                ESP_LOGI(TAG, "Channel %d set to %d", ch, val);
+            }
+            break;
+        default:
+            ESP_LOGW(TAG, "Unbekannter Modus: %c", mode);
+            return CMD_ERROR_INVALID_VALUE;
         }
-        break;
+
+        return result;
     }
-
-    case 'P':
-        val = (val * 255) / 100;
-        // Clamp percentage to valid range
-        val = (val < 0) ? 0 : (val > 255) ? 255 : val;
-        __attribute__((fallthrough));
-    case 'C':
-        result = set_channel(ch, val, fade_ms);
-        if (result == CMD_SUCCESS) {
-            ESP_LOGI(TAG, "Kanal %d gesetzt auf %d", ch, val);
-        }
-        break;
-    default:
-        ESP_LOGW(TAG, "Unbekannter Modus: %c", mode);
-        return CMD_ERROR_INVALID_VALUE;
-    }
-
-    return result;
-}
 }
 
 void udp_server_task(void *arg)
@@ -492,10 +536,9 @@ void udp_server_task(void *arg)
     }
 
     struct sockaddr_in bind_addr = {
-        .sin_family = AF_INET, 
-        .sin_port = htons(UDP_PORT), 
-        .sin_addr.s_addr = htonl(INADDR_ANY)
-    };
+        .sin_family = AF_INET,
+        .sin_port = htons(UDP_PORT),
+        .sin_addr.s_addr = htonl(INADDR_ANY)};
 
     if (bind(sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0)
     {
@@ -504,7 +547,7 @@ void udp_server_task(void *arg)
         vTaskDelete(NULL);
         return;
     }
-    
+
     char rx_buffer[MAX_UDP_BUFFER_SIZE];
     struct sockaddr_in6 source_addr;
     socklen_t socklen = sizeof(source_addr);
@@ -513,30 +556,35 @@ void udp_server_task(void *arg)
 
     while (1)
     {
-        int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, 
-                          (struct sockaddr *)&source_addr, &socklen);
-        
-        if (len < 0) {
+        int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0,
+                           (struct sockaddr *)&source_addr, &socklen);
+
+        if (len < 0)
+        {
             ESP_LOGW(TAG, "UDP recvfrom failed: errno %d", errno);
             continue;
         }
-        
+
         ESP_LOGD(TAG, "UDP empfangen, Länge = %d", len);
-        
+
         if (len == DMX_UNIVERSE_SIZE)
         {
             // Full DMX universe data
-            if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (xSemaphoreTake(dmx_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+            {
                 memcpy(dmx_data, rx_buffer, DMX_UNIVERSE_SIZE);
                 for (int i = 0; i < DMX_UNIVERSE_SIZE; ++i)
                     fade_states[i].active = false;
-                
+
                 esp_err_t err = dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-                if (err != ESP_OK) {
+                if (err != ESP_OK)
+                {
                     ESP_LOGW(TAG, "DMX write failed: %s", esp_err_to_name(err));
                 }
                 xSemaphoreGive(dmx_mutex);
-            } else {
+            }
+            else
+            {
                 ESP_LOGW(TAG, "Failed to acquire mutex for DMX universe update");
             }
         }
@@ -545,9 +593,10 @@ void udp_server_task(void *arg)
             rx_buffer[len] = '\0';
             ESP_LOGI(TAG, "DMX-Befehl empfangen: \"%s\"", rx_buffer);
             my_led_blink(1, 20);
-            
+
             command_result_t result = handle_udp_command(rx_buffer);
-            if (result != CMD_SUCCESS) {
+            if (result != CMD_SUCCESS)
+            {
                 ESP_LOGW(TAG, "Command execution failed with result: %d", result);
             }
         }
@@ -556,7 +605,7 @@ void udp_server_task(void *arg)
             ESP_LOGW(TAG, "Invalid UDP packet received, length: %d", len);
         }
     }
-    
+
     close(sock);
 }
 
@@ -570,7 +619,8 @@ void app_main()
 
     // Initialize mutex for thread-safe DMX operations
     dmx_mutex = xSemaphoreCreateMutex();
-    if (dmx_mutex == NULL) {
+    if (dmx_mutex == NULL)
+    {
         ESP_LOGE(TAG, "Failed to create DMX mutex");
         return;
     }
@@ -581,33 +631,38 @@ void app_main()
     // DMX Setup
     dmx_config_t config = DMX_CONFIG_DEFAULT;
     esp_err_t err = dmx_driver_install(dmx_num, &config, NULL, 0);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "DMX driver install failed: %s", esp_err_to_name(err));
         return;
     }
-    
+
     err = dmx_set_pin(dmx_num, TX_PIN, RX_PIN, EN_PIN);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "DMX pin setup failed: %s", esp_err_to_name(err));
         return;
     }
 
     memset(dmx_data, 0, sizeof(dmx_data));
     err = dmx_write(dmx_num, dmx_data, DMX_UNIVERSE_SIZE);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGW(TAG, "Initial DMX write failed: %s", esp_err_to_name(err));
     }
 
     // Tasks starten
     BaseType_t task_result;
     task_result = xTaskCreate(udp_server_task, "udp_server", 8192, NULL, 5, NULL);
-    if (task_result != pdPASS) {
+    if (task_result != pdPASS)
+    {
         ESP_LOGE(TAG, "Failed to create UDP server task");
         return;
     }
-    
+
     task_result = xTaskCreate(fade_task, "fade_task", 4096, NULL, 5, NULL);
-    if (task_result != pdPASS) {
+    if (task_result != pdPASS)
+    {
         ESP_LOGE(TAG, "Failed to create fade task");
         return;
     }
@@ -618,12 +673,13 @@ void app_main()
     spiffs_init();
     config_load_from_spiffs("/spiffs/config.json");
     start_rest_server();
-    
+
     TickType_t last = xTaskGetTickCount();
     while (1)
     {
         err = dmx_send(dmx_num);
-        if (err != ESP_OK) {
+        if (err != ESP_OK)
+        {
             ESP_LOGW(TAG, "DMX send failed: %s", esp_err_to_name(err));
         }
         vTaskDelayUntil(&last, pdMS_TO_TICKS(30));

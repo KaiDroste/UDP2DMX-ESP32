@@ -10,7 +10,6 @@
 static const char *TAG = "config_rest";
 static const char *CONFIG_PATH = "/spiffs/config.json";
 
-
 void cjson_merge_objects(cJSON *target, const cJSON *patch)
 {
     const cJSON *entry = NULL;
@@ -18,23 +17,27 @@ void cjson_merge_objects(cJSON *target, const cJSON *patch)
     {
         cJSON *existing = cJSON_GetObjectItem(target, entry->string);
 
-        if (cJSON_IsObject(entry) && cJSON_IsObject(existing)) {
+        if (cJSON_IsObject(entry) && cJSON_IsObject(existing))
+        {
             // Rekursiv mergen
             cjson_merge_objects(existing, entry);
-        } else {
+        }
+        else
+        {
             // Überschreiben oder neu einfügen
-            if (existing) {
+            if (existing)
+            {
                 cJSON_ReplaceItemInObject(target, entry->string, cJSON_Duplicate(entry, 1));
-            } else {
+            }
+            else
+            {
                 cJSON_AddItemToObject(target, entry->string, cJSON_Duplicate(entry, 1));
             }
-
         }
     }
 }
 
-
-// Liest Datei und gibt sie als Zeichenkette zurück
+// Reads file and returns it as string
 char *read_file(const char *path)
 {
     FILE *f = fopen(path, "r");
@@ -58,7 +61,7 @@ char *read_file(const char *path)
     return data;
 }
 
-// Speichert eine JSON-Zeichenkette in Datei
+// Saves a JSON string to file
 esp_err_t save_json(const char *path, const char *json)
 {
     FILE *f = fopen(path, "w");
@@ -70,7 +73,7 @@ esp_err_t save_json(const char *path, const char *json)
     return ESP_OK;
 }
 
-// GET /config – gibt aktuelle JSON-Datei zurück
+// GET /config – returns current JSON file
 esp_err_t get_config_handler(httpd_req_t *req)
 {
     char *data = read_file(CONFIG_PATH);
@@ -86,7 +89,7 @@ esp_err_t get_config_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-// POST /config – neue JSON-Konfiguration empfangen und speichern
+// POST /config – receive and save new JSON configuration
 esp_err_t post_config_handler(httpd_req_t *req)
 {
     char buffer[2048];
@@ -94,7 +97,7 @@ esp_err_t post_config_handler(httpd_req_t *req)
 
     if (total_len >= sizeof(buffer))
     {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON zu groß");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON too large");
         return ESP_FAIL;
     }
 
@@ -109,11 +112,11 @@ esp_err_t post_config_handler(httpd_req_t *req)
     cJSON *json = cJSON_Parse(buffer);
     if (!json)
     {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Ungültiges JSON");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_FAIL;
     }
 
-    cJSON_Delete(json); // Validierung ok
+    cJSON_Delete(json); // Validation ok
 
     if (save_json(CONFIG_PATH, buffer) != ESP_OK)
     {
@@ -133,16 +136,16 @@ esp_err_t patch_config_handler(httpd_req_t *req)
 {
     int total_len = req->content_len;
 
-    if (total_len <= 0 || total_len > 8192) // Willkürliche Obergrenze als Schutz
+    if (total_len <= 0 || total_len > 8192) // Arbitrary upper limit for protection
     {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Ungültige Länge");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid length");
         return ESP_FAIL;
     }
 
     char *buf = malloc(total_len + 1);
     if (!buf)
     {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Speicherfehler");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory error");
         return ESP_FAIL;
     }
 
@@ -155,7 +158,7 @@ esp_err_t patch_config_handler(httpd_req_t *req)
     }
     buf[ret] = '\0';
 
-    // Bestehende Konfiguration laden
+    // Load existing configuration
     char *existing_json = read_file(CONFIG_PATH);
     if (!existing_json)
     {
@@ -169,7 +172,7 @@ esp_err_t patch_config_handler(httpd_req_t *req)
     if (!root)
     {
         free(buf);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Bestehendes JSON fehlerhaft");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Existing JSON corrupted");
         return ESP_FAIL;
     }
 
@@ -178,14 +181,13 @@ esp_err_t patch_config_handler(httpd_req_t *req)
     if (!patch)
     {
         cJSON_Delete(root);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Ungültiger Patch");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid patch");
         return ESP_FAIL;
     }
 
     // Generisches rekursives Patchen
     cjson_merge_objects(root, patch);
     cJSON_Delete(patch);
-
 
     char *updated_json = cJSON_Print(root);
     ESP_LOGD(TAG, "Aktualisierte JSON-Konfiguration:\n%s", updated_json);
