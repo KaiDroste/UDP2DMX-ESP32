@@ -25,7 +25,7 @@ config WIFI_PASS_3
     default ""
 
 config WIFI_SWITCH_BUTTON_GPIO
-    int "GPIO für Netzwerkauswahl"
+    int "GPIO for network selection"
     default 0
 
 endmenu

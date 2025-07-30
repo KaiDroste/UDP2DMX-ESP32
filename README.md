@@ -3,7 +3,12 @@
 A lightweight and flexible UDP-to-DMX gateway based on the ESP32 platform, designed to bridge the **Loxone Home Automation System** with **DMX512-based lighting systems** via UDP over Wi-Fi.
 
 This project enables direct communication between Loxone and DMX devices using a well-defined, lightweight UDP protocol. It is ideal for smart home installations where wireless DMX control is required.
- 
+
+---
+
+## ⚙️ Key Features
+
+
 - ✅ Based on the open-source [ESP-DMX library](https://github.com/someweisguy/esp_dmx)  
 - ✅ UDP-based protocol (compatible with Loxone UDP protocol)  
 - ✅ Easily testable via Jupyter notebook  
@@ -14,8 +19,7 @@ This project enables direct communication between Loxone and DMX devices using a
 
 ### 1. Install ESP-IDF
 
-Make sure ESP-IDF v5.0 is installed and properly set up. For installation instructions, refer to the [official ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html).
-Version newer than v5.0 is currently not supported
+Make sure ESP-IDF **v5.0** is installed and properly set up. For installation instructions, refer to the [official ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html).
 
 ---
 
@@ -38,35 +42,82 @@ idf.py menuconfig
 
 Set the following options:
 
-- 📶 **Wi-Fi Configuration**  
-  - SSID / Password
-  - Select between multiple Wi-Fi networks if applicable
-
-- 🎚️ **DMX Configuration**  
-  - TX Pin (to MAX485)
-  - RX Pin (optional, for monitoring or debugging)
-
-- 💡 **LED Configuration**  
-  - GPIO for status LED (blinks on DMX activity)
-
-- 🔘 **Button Configuration**  
-  - GPIO for physical mode switching (if required)
+- 📶 **Component config → Wi-Fi Configuration**  
+  - SSID and password for up to 3 different Wi-Fi networks
+  - GPIO pin for network selection button (default: GPIO 0)
 
 ---
 
-### 4. Build and Flash Firmware
+### 4. Advanced Configuration via REST API
+
+After the device is running, you can configure advanced settings via the built-in REST API:
+
+#### 📋 Configuration File Structure
+
+The device uses a `config.json` file stored in SPIFFS with the following structure:
+
+```json
+{
+    "hostname": "udp2dmx2",
+    "ct_config": {
+        "1": 2700,
+        "2": 6500,
+        "5": 3000
+    },
+    "default_ct": {
+        "min": 3400,
+        "max": 6600
+    }
+}
+```
+
+#### 🌐 REST API Endpoints
+
+| Method  | Endpoint        | Description                          |
+| ------- | --------------- | ------------------------------------ |
+| `GET`   | `/config`       | Retrieve current configuration       |
+| `POST`  | `/config`       | Replace entire configuration         |
+| `PATCH` | `/config/patch` | Update specific configuration values |
+
+#### 📝 Configuration Options
+
+- **`hostname`**: Device hostname for network identification
+- **`ct_config`**: Color temperature mapping for specific channels (channel → Kelvin)
+- **`default_ct`**: Default color temperature range for DMXL commands
+  - `min`: Minimum color temperature in Kelvin
+  - `max`: Maximum color temperature in Kelvin
+
+#### 💡 Example Usage
+
+```bash
+# Get current configuration
+curl http://192.168.1.100/config
+
+# Update hostname
+curl -X PATCH http://192.168.1.100/config/patch \
+  -H "Content-Type: application/json" \
+  -d '{"hostname": "my-dmx-gateway"}'
+
+# Set color temperature for channel 3
+curl -X PATCH http://192.168.1.100/config/patch \
+  -H "Content-Type: application/json" \
+  -d '{"ct_config": {"3": 4000}}'
+```
+
+---
+
+### 5. Build and Flash Firmware
 
 ```bash
 idf.py build
 idf.py flash
 idf.py spiffs-flash
-
-
 ```
 
 ---
 
-### 5. Monitor Output
+### 6. Monitor Output
+*Optional*
 
 ```bash
 idf.py monitor
@@ -77,6 +128,7 @@ After flashing, the device will connect to Wi-Fi and output its IP address via s
 ---
 
 ## 🧪 DMX Communication Test
+*Optional*
 
 You can use the included **`testudp.ipynb`** Jupyter Notebook to send test UDP commands:
 
@@ -123,13 +175,38 @@ The device expects UDP packets in the following formats:
 | **User action**<br>(e.g. Wi-Fi switch)  | **Short blinking sequence** | `n` blinks with `delay_ms` (e.g. 2× 50 ms)    |
 | **Network selection via button**        | **1–3 blinks**              | Number of blinks = selected network index + 1 |
 
+---
 
+## 📁 Project Structure
+
+```
+main/
+├── include/                     # Public header files
+│   ├── dmx_manager.h           # DMX hardware abstraction
+│   ├── udp_protocol.h          # UDP protocol handling
+│   ├── udp_server.h            # UDP server implementation
+│   └── system_config.h         # System configuration
+├── src/                        # Source files
+│   ├── main.c                  # Application entry point
+│   ├── dmx_manager.c           # DMX management & fade engine
+│   ├── udp_protocol.c          # Protocol parsing & execution
+│   ├── udp_server.c            # UDP server & packet handling
+│   └── system_config.c         # Configuration management
+└── CMakeLists.txt              # Build configuration
+
+components/
+├── my_wifi/                    # WiFi management
+├── my_led/                     # LED status indication
+├── my_config/                  # Configuration (CT values, hostname)
+└── config_handler/             # REST API for configuration
+```
 
 ---
+
 ## 📋 Requirements
 
 - ESP32 board (e.g., ESP32 DevKitC)
-- RS485 transceiver (e.g., MAX485)
+- RS485 transceiver (e.g., MAX485) I am using: MAX 13487
 - DMX-compatible light or fixture
 - Python + Jupyter (optional, for testing)
 
@@ -138,7 +215,7 @@ The device expects UDP packets in the following formats:
 ## 🙏 Credits
 
 - [ESP-DMX Library](https://github.com/someweisguy/esp_dmx) by [@someweisguy](https://github.com/someweisguy)
-- UDP DMX protocol by **Robert Lechner**
+- **Robert Lechner** for documenting the UDP DMX protocol
 
 ---
 
