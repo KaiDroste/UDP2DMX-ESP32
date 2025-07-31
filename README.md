@@ -10,7 +10,6 @@ This project enables direct communication between Loxone and DMX devices using a
 
 ## ⚙️ Key Features
 
-
 - ✅ Based on the open-source [ESP-DMX library](https://github.com/someweisguy/esp_dmx)  
 - ✅ UDP-based protocol (compatible with Loxone UDP protocol)  
 - ✅ Easily testable via Jupyter notebook  
@@ -163,7 +162,7 @@ The device expects UDP packets in the following formats:
 | **C** | `DMXC<ch>#<value>#<fade>`            | Set a single channel (0–255) with optional fade time.                                                                                         |
 | **R** | `DMXR<ch>#<rgb>#<fade>`              | Set 3 consecutive channels for RGB values. Format: `RRRGGGBBB` (e.g., `128128128`).                                                           |
 | **W** | `DMXW<ch>#<wwcw>#<fade>`             | Set 2 consecutive channels for Tunable White. Format: `WWWCCC` (e.g., `200050` = WW:200, CW:50).                                              |
-| **L** | `DMXL<ch>#20<brightness><CT>#<fade>` | Set brightness and color temperature. Can be used with the Lumitech type from Loxone Format: `20BBBTTTT` (e.g., `200507000` = 50% at 7000 K). |
+| **L** | `DMXL<ch>#20<brightness><CT>#<fade>` | Set brightness and color temperature. Can be used with the Lumitech type from Loxone Format: `20BBBTTTT` (e.g., `200507000` = 50% at 7000 K). |
 
 ---
 
@@ -172,9 +171,9 @@ The device expects UDP packets in the following formats:
 | Condition                               | LED Behavior                | Description                                   |
 | --------------------------------------- | --------------------------- | --------------------------------------------- |
 | **Wi-Fi connected**<br>**No DMX error** | **Off (constantly)**        | Normal operation                              |
-| **Wi-Fi disconnected**                  | **Slow blinking**           | 500 ms on / 500 ms off                        |
-| **DMX error active**                    | **Fast blinking**           | 100 ms on / 100 ms off                        |
-| **User action**<br>(e.g. Wi-Fi switch)  | **Short blinking sequence** | `n` blinks with `delay_ms` (e.g. 2× 50 ms)    |
+| **Wi-Fi disconnected**                  | **Slow blinking**           | 500 ms on / 500 ms off                        |
+| **DMX error active**                    | **Fast blinking**           | 100 ms on / 100 ms off                        |
+| **User action**<br>(e.g. Wi-Fi switch)  | **Short blinking sequence** | `n` blinks with `delay_ms` (e.g. 2× 50 ms)    |
 | **Network selection via button**        | **1–3 blinks**              | Number of blinks = selected network index + 1 |
 
 ---
@@ -218,6 +217,14 @@ components/
 
 - [ESP-DMX Library](https://github.com/someweisguy/esp_dmx) by [@someweisguy](https://github.com/someweisguy)
 - **Robert Lechner** for documenting the UDP DMX protocol
+
+---
+
+## 💖 Support
+
+If this project helps you, consider buying me a coffee! ☕
+
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/kai009)
 
 ---
 
